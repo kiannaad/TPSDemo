@@ -490,7 +490,7 @@ def count_by_severity(findings: list[Finding]) -> dict[str, int]:
     return counts
 
 
-def format_review_body(context: ReviewContext, ai_summary: str, findings: list[Finding], ignored_count: int) -> str:
+def format_review_body(context: ReviewContext, ai_summary: str, findings: list[Finding], ignored_files: list[str], reviewed_files: list[str]) -> str:
     counts = count_by_severity(findings)
     verdict = "REQUEST_CHANGES" if counts["blocking"] or counts["major"] >= 3 else "COMMENT"
     target_text = f"PR #{context.pr_number}" if context.mode == "pr" else f"push `{context.after_sha or context.head_ref}`"
@@ -505,13 +505,29 @@ def format_review_body(context: ReviewContext, ai_summary: str, findings: list[F
         f"- Major: {counts['major']}",
         f"- Minor: {counts['minor']}",
         f"- Nit: {counts['nit']}",
-        f"- Ignored files: {ignored_count}",
+        f"- Reviewed files: {len(reviewed_files)}",
+        f"- Ignored files: {len(ignored_files)}",
         "",
         f"AI summary: {ai_summary}",
     ]
 
+    if reviewed_files:
+        lines.extend(["", "### Reviewed files", ""])
+        lines.extend(f"- `{path}`" for path in reviewed_files[:20])
+        if len(reviewed_files) > 20:
+            lines.append(f"- ...另有 {len(reviewed_files) - 20} 个文件")
+
+    if ignored_files:
+        lines.extend(["", "### Ignored files", ""])
+        lines.extend(f"- `{path}`" for path in ignored_files[:20])
+        if len(ignored_files) > 20:
+            lines.append(f"- ...另有 {len(ignored_files) - 20} 个文件")
+
     if not findings:
-        lines.extend(["", "没有发现需要阻塞合并的问题。"])
+        if reviewed_files:
+            lines.extend(["", "没有发现需要阻塞合并的问题。"])
+        else:
+            lines.extend(["", "本次没有进入审查的文件。请检查 `.ai-review.yml` 的 `paths.ignore` 配置是否把目标文件过滤掉了。"])
         return "\n".join(lines)
 
     severity_order = {"blocking": 0, "major": 1, "minor": 2, "nit": 3}
@@ -582,13 +598,14 @@ def main() -> int:
 
     ignore_patterns = config["paths"].get("ignore", [])
     files = [file for file in raw_files if not matches_any(file["filename"], ignore_patterns)]
-    ignored_count = len(raw_files) - len(files)
+    ignored_files = [file["filename"] for file in raw_files if matches_any(file["filename"], ignore_patterns)]
+    reviewed_files = [file["filename"] for file in files]
 
     rule_findings = rule_review(files, config)
     ai_summary, ai_findings = call_ai(context, files, config)
     findings = deduplicate(rule_findings + ai_findings)
 
-    body = format_review_body(context, ai_summary, findings, ignored_count)
+    body = format_review_body(context, ai_summary, findings, ignored_files, reviewed_files)
     write_step_summary(body)
 
     event = "REQUEST_CHANGES" if should_fail(findings, config) else "COMMENT"
