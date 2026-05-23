@@ -396,6 +396,8 @@ def build_ai_prompt(context: ReviewContext, files: list[dict[str, Any]], config:
 
 def normalize_chat_completions_url(base_url: str) -> str:
     base_url = base_url.strip().rstrip("/")
+    if not base_url:
+        base_url = "https://api.openai.com/v1"
     if base_url.endswith("/chat/completions"):
         return base_url
     if base_url.endswith("/v1"):
@@ -409,7 +411,7 @@ def call_ai(context: ReviewContext, files: list[dict[str, Any]], config: dict[st
         return "未配置 AI_REVIEW_API_KEY / OPENAI_API_KEY，本次只执行确定性规则审查。", []
 
     model = os.getenv("AI_REVIEW_MODEL", "gpt-4o-mini")
-    base_url = normalize_chat_completions_url(os.getenv("AI_REVIEW_BASE_URL", "https://api.openai.com/v1"))
+    base_url = normalize_chat_completions_url(os.getenv("AI_REVIEW_BASE_URL") or "https://api.openai.com/v1")
     prompt = build_ai_prompt(context, files, config)
     payload = {
         "model": model,
