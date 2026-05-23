@@ -394,12 +394,22 @@ def build_ai_prompt(context: ReviewContext, files: list[dict[str, Any]], config:
     """).strip()
 
 
+def normalize_chat_completions_url(base_url: str) -> str:
+    base_url = base_url.strip().rstrip("/")
+    if base_url.endswith("/chat/completions"):
+        return base_url
+    if base_url.endswith("/v1"):
+        return f"{base_url}/chat/completions"
+    return f"{base_url}/v1/chat/completions"
+
+
 def call_ai(context: ReviewContext, files: list[dict[str, Any]], config: dict[str, Any]) -> tuple[str, list[Finding]]:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("AI_REVIEW_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return "未配置 OPENAI_API_KEY，本次只执行确定性规则审查。", []
+        return "未配置 AI_REVIEW_API_KEY / OPENAI_API_KEY，本次只执行确定性规则审查。", []
 
     model = os.getenv("AI_REVIEW_MODEL", "gpt-4o-mini")
+    base_url = normalize_chat_completions_url(os.getenv("AI_REVIEW_BASE_URL", "https://api.openai.com/v1"))
     prompt = build_ai_prompt(context, files, config)
     payload = {
         "model": model,
@@ -411,7 +421,7 @@ def call_ai(context: ReviewContext, files: list[dict[str, Any]], config: dict[st
         ],
     }
     req = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
+        base_url,
         data=json.dumps(payload).encode("utf-8"),
         method="POST",
         headers={
