@@ -30,10 +30,12 @@ DEFAULT_CONFIG = {
     "review": {
         "fail_on": ["blocking"],
         "max_major_before_fail": 3,
+        "require_tests_severity": "minor",
     },
     "limits": {
         "max_patch_chars": 60000,
         "max_file_patch_chars": 12000,
+        "max_context_chars": 12000,
     },
     "paths": {
         "ignore": [
@@ -50,10 +52,17 @@ DEFAULT_CONFIG = {
             "*.meta",
         ],
         "require_tests_for": ["server/src/**", "Assets/Script/**"],
+        "context_docs": [
+            "Doc/项目设计/整体规划/three-month-steam-pve-shooter-demo-plan.md",
+            "Doc/项目设计/客户端设计/minimal-3c-client-design.md",
+            "Doc/项目设计/客户端设计/network-sync-design.md",
+            "Doc/项目设计/服务端设计/unity-cpp-steam-design-plan.md",
+        ],
     },
     "style": {
         "language": "zh-CN",
         "strictness": "medium",
+        "review_depth": "semantic",
     },
 }
 
@@ -189,7 +198,7 @@ def load_config(path: Path) -> dict[str, Any]:
                 else:
                     config[current_section][current_key] = value
             else:
-                config[current_section].setdefault(current_key, [])
+                config[current_section][current_key] = []
             continue
         if line.startswith("    - ") and current_key:
             item = stripped[2:].strip().strip("\"'")
@@ -320,17 +329,41 @@ def rule_review(files: list[dict[str, Any]], config: dict[str, Any]) -> list[Fin
     if not has_test_change:
         risky_paths = [path for path in changed_paths if matches_any(path, require_tests_for)]
         if risky_paths:
+            severity = str(config["review"].get("require_tests_severity", "minor"))
+            if severity not in {"blocking", "major", "minor", "nit"}:
+                severity = "minor"
             findings.append(Finding(
-                severity="major",
+                severity=severity,
                 category="test",
                 file=risky_paths[0],
                 line=None,
-                title="高风险代码变更缺少测试同步更新",
-                body="本 PR 修改了核心服务端或 gameplay 脚本，但没有看到测试、验证脚本或测试说明变更。",
-                suggestion="补充自动化测试，或在 PR 描述中说明手动验证步骤和覆盖范围。",
+                title="核心路径变更缺少测试或验证说明",
+                body="本次修改触及核心服务端或 gameplay 脚本，但没有看到测试、验证脚本或测试说明变更。小型示例代码可接受，但正式功能应补充验证入口。",
+                suggestion="补充自动化测试，或在提交/PR说明中写清楚手动验证步骤和覆盖范围。",
             ))
 
     return findings
+
+
+def read_context_docs(config: dict[str, Any]) -> str:
+    max_context_chars = int(config["limits"].get("max_context_chars", 12000))
+    context_paths = config["paths"].get("context_docs", [])
+    chunks: list[str] = []
+    remaining = max_context_chars
+
+    for raw_path in context_paths:
+        path = Path(str(raw_path))
+        if remaining <= 0 or not path.exists():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+        if not text:
+            continue
+        if len(text) > remaining:
+            text = text[:remaining] + "\n...[context truncated]..."
+        chunks.append(f"## {raw_path}\n{text}")
+        remaining -= len(text)
+
+    return "\n\n".join(chunks)
 
 
 def build_ai_prompt(context: ReviewContext, files: list[dict[str, Any]], config: dict[str, Any]) -> str:
@@ -350,28 +383,43 @@ def build_ai_prompt(context: ReviewContext, files: list[dict[str, Any]], config:
     if len(diff_text) > max_patch_chars:
         diff_text = diff_text[:max_patch_chars] + "\n\n...[diff truncated]..."
 
+    project_context = read_context_docs(config)
+
     return textwrap.dedent(f"""
     你是一个严格但务实的 AI Code Reviewer。请只审查本 PR diff，不要臆测没有出现的代码。
 
-    请从这些角度审查：
-    - correctness: 逻辑正确性、边界条件、崩溃风险
-    - security: 注入、凭据、权限、反序列化、命令执行等安全风险
-    - maintainability: 命名、复杂度、重复、模块边界
-    - architecture: 职责边界、长期演进风险
-    - performance: Unity/C++/服务端高频路径性能问题
-    - testability: 是否缺少测试或验证入口
-    - style: 代码审美，但只有影响维护时才提高严重级别
+    你必须重点检查三类问题：
+    1. 语法/编译风险：C# / C++ 是否可能编译失败、缺少 using、Unity API 使用错误、类型/访问级别/生命周期明显错误。
+    2. 业务语义：这段 diff 是否实现了它看起来想实现的业务目标，是否符合项目文档中的当前方向、模块边界和验收标准。
+    3. 规范与审美：命名、职责边界、复杂度、Unity 生命周期、可调参数、可测试性、可维护性。
+
+    同时继续检查：
+    - security: 注入、凭据、权限、反序列化、命令执行等安全风险。
+    - performance: Unity/C++/服务端高频路径性能问题。
+    - architecture: 是否破坏输入/运动/动画/射击/表现分层，是否让客户端承担服务端权威职责。
+
+    项目特定审查标准：
+    - 客户端 3C 代码应尽量遵守输入层、运动层、动画层、射击层、表现层分离。
+    - 真实移动应由运动层决定，动画只消费运动结果。
+    - 第一版射击使用 hitscan，相机中心射线是命中真源。
+    - 联机相关逻辑中，房间、敌人、伤害、死亡应由服务端或房主权威决定，客户端只做表现和局部预测。
+    - 当前项目目标是 2 人合作线性 PVE 试玩版，不应引入大而全系统。
 
     严重级别只能是 blocking、major、minor、nit。
     blocking 只用于必须打回的问题，比如安全漏洞、确定性崩溃、数据损坏、破坏关键协议或明显不可合并。
+    major 用于很可能导致功能不成立、业务语义错误、编译失败、架构边界明显破坏的问题。
+    minor 用于应该修但不阻塞的问题。
+    nit 用于纯风格建议。
+
+    如果代码整体是好的，也要明确说明它好在哪里。不要为了评论而评论。
 
     输出必须是 JSON，不要包 markdown：
     {{
-      "summary": "一句话总结",
+      "summary": "2-4 句话总结本次 diff 是否实现了目标、主要风险是什么",
       "findings": [
         {{
           "severity": "major",
-          "category": "correctness",
+          "category": "compile | business | correctness | security | architecture | performance | testability | style",
           "file": "path/to/file.cs",
           "line": 12,
           "title": "短标题",
@@ -388,6 +436,9 @@ def build_ai_prompt(context: ReviewContext, files: list[dict[str, Any]], config:
     - author: {context.author}
     - base: {context.base_ref}
     - head: {context.head_ref}
+
+    Project context:
+    {project_context}
 
     Diff:
     {diff_text}
@@ -490,6 +541,22 @@ def count_by_severity(findings: list[Finding]) -> dict[str, int]:
     return counts
 
 
+def category_label(category: str) -> str:
+    labels = {
+        "compile": "语法 / 编译风险",
+        "business": "业务语义",
+        "correctness": "正确性",
+        "security": "安全",
+        "architecture": "架构 / 职责边界",
+        "performance": "性能",
+        "testability": "可测试性",
+        "test": "测试 / 验证",
+        "style": "规范 / 审美",
+        "reviewability": "可审查性",
+    }
+    return labels.get(category, category)
+
+
 def format_review_body(context: ReviewContext, ai_summary: str, findings: list[Finding], ignored_files: list[str], reviewed_files: list[str]) -> str:
     counts = count_by_severity(findings)
     verdict = "REQUEST_CHANGES" if counts["blocking"] or counts["major"] >= 3 else "COMMENT"
@@ -531,27 +598,54 @@ def format_review_body(context: ReviewContext, ai_summary: str, findings: list[F
         return "\n".join(lines)
 
     severity_order = {"blocking": 0, "major": 1, "minor": 2, "nit": 3}
-    sorted_findings = sorted(findings, key=lambda item: (severity_order.get(item.severity, 99), item.file, item.line or 0))
-    for finding in sorted_findings[:30]:
-        location = finding.file
-        if finding.line:
-            location += f":{finding.line}"
-        lines.extend([
-            "",
-            f"### [{finding.severity.upper()}] {finding.title}",
-            "",
-            f"- Category: `{finding.category}`",
-            f"- Source: `{finding.source}`",
-            f"- Location: `{location}`",
-            f"- Confidence: `{finding.confidence:.2f}`",
-            "",
-            finding.body,
-        ])
-        if finding.suggestion:
-            lines.extend(["", f"建议：{finding.suggestion}"])
+    category_order = {
+        "compile": 0,
+        "business": 1,
+        "correctness": 2,
+        "security": 3,
+        "architecture": 4,
+        "performance": 5,
+        "testability": 6,
+        "test": 7,
+        "style": 8,
+        "reviewability": 9,
+    }
+    sorted_findings = sorted(
+        findings,
+        key=lambda item: (
+            category_order.get(item.category, 99),
+            severity_order.get(item.severity, 99),
+            item.file,
+            item.line or 0,
+        ),
+    )
 
-    if len(sorted_findings) > 30:
-        lines.extend(["", f"...另有 {len(sorted_findings) - 30} 条发现未展开。"])
+    expanded = 0
+    for category in sorted({finding.category for finding in sorted_findings}, key=lambda item: category_order.get(item, 99)):
+        category_findings = [finding for finding in sorted_findings if finding.category == category]
+        lines.extend(["", f"## {category_label(category)}", ""])
+        for finding in category_findings:
+            if expanded >= 30:
+                break
+            location = finding.file
+            if finding.line:
+                location += f":{finding.line}"
+            lines.extend([
+                f"### [{finding.severity.upper()}] {finding.title}",
+                "",
+                f"- Source: `{finding.source}`",
+                f"- Location: `{location}`",
+                f"- Confidence: `{finding.confidence:.2f}`",
+                "",
+                finding.body,
+            ])
+            if finding.suggestion:
+                lines.extend(["", f"建议：{finding.suggestion}"])
+            lines.append("")
+            expanded += 1
+
+    if len(sorted_findings) > expanded:
+        lines.extend(["", f"...另有 {len(sorted_findings) - expanded} 条发现未展开。"])
 
     lines.extend([
         "",

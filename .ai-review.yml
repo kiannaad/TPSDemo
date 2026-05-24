@@ -5,10 +5,12 @@ review:
   fail_on:
     - blocking
   max_major_before_fail: 3
+  require_tests_severity: minor
 
 limits:
   max_patch_chars: 60000
   max_file_patch_chars: 12000
+  max_context_chars: 12000
 
 paths:
   ignore:
@@ -28,7 +30,13 @@ paths:
   require_tests_for:
     - "server/src/**"
     - "Assets/Script/**"
+  context_docs:
+    - "Doc/项目设计/整体规划/three-month-steam-pve-shooter-demo-plan.md"
+    - "Doc/项目设计/客户端设计/minimal-3c-client-design.md"
+    - "Doc/项目设计/客户端设计/network-sync-design.md"
+    - "Doc/项目设计/服务端设计/unity-cpp-steam-design-plan.md"
 
 style:
   language: "zh-CN"
   strictness: "medium"
+  review_depth: "semantic"
