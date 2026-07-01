@@ -32,10 +32,6 @@ Thumbs.db
 *.tmp
 *.rsuser
 
-# Python cache
-__pycache__/
-*.py[cod]
-
 # Crash reports
 sysinfo.txt
 
@@ -48,7 +44,3 @@ sysinfo.txt
 .env
 .env.*
 !.env.example
-
-# Harness Automation System
-.harness/state.json
-.harness/backups/
