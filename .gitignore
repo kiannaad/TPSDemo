@@ -52,3 +52,6 @@ sysinfo.txt
 # Harness Automation System
 .harness/state.json
 .harness/backups/
+
+# Plugins ExampleProgram
+Assets\KinematicCharacterController
