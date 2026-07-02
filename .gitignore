@@ -54,4 +54,5 @@ sysinfo.txt
 .harness/backups/
 
 # Plugins ExampleProgram
-Assets\KinematicCharacterController
+/Assets/KinematicCharacterController/
+/Assets/KinematicCharacterController.meta

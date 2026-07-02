@@ -5,7 +5,7 @@ namespace CGame
 {
     public class InputManager : IManager
     {
-        internal override int Priority => 100;
+        public override int Priority => 100;
 
         private PlayerInput rawInput;
         private Dictionary<InputType, InputHandle> handles;
@@ -13,7 +13,7 @@ namespace CGame
         /// <summary>
         /// 初始化输入管理器并启用默认 Player 输入方案。
         /// </summary>
-        internal override void Init()
+        public override void Init()
         {
             rawInput = new PlayerInput();
             handles = new Dictionary<InputType, InputHandle>
@@ -28,7 +28,7 @@ namespace CGame
         /// <summary>
         /// 每帧刷新所有输入状态快照。
         /// </summary>
-        internal override void Update(float elapseSeconds)
+        public override void Update(float elapseSeconds)
         {
             foreach (KeyValuePair<InputType, InputHandle> kv in handles)
             {
@@ -53,7 +53,7 @@ namespace CGame
         /// <summary>
         /// 关闭输入管理器并释放底层输入资源。
         /// </summary>
-        internal override void Shutdown()
+        public override void Shutdown()
         {
             foreach (KeyValuePair<InputType, InputHandle> kv in handles)
             {
