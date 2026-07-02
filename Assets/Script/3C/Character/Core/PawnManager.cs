@@ -4,7 +4,7 @@ namespace CGame
 {
     public class PawnManager : IManager
     {
-        private readonly List<Pawn> _pawns = new List<Pawn>();
+        private readonly List<Pawn> pawns = new List<Pawn>();
 
         public override int Priority => 80;
 
@@ -13,12 +13,12 @@ namespace CGame
         /// </summary>
         public void RegisteringPawn(Pawn pawn)
         {
-            if (pawn == null || _pawns.Contains(pawn))
+            if (pawn == null || pawns.Contains(pawn))
             {
                 return;
             }
 
-            _pawns.Add(pawn);
+            pawns.Add(pawn);
         }
 
         /// <summary>
@@ -26,7 +26,7 @@ namespace CGame
         /// </summary>
         public void UnregisteringPawn(Pawn pawn)
         {
-            if (!_pawns.Remove(pawn))
+            if (!pawns.Remove(pawn))
             {
                 return;
             }
@@ -39,9 +39,9 @@ namespace CGame
         /// </summary>
         public override void FixedUpdate(float elapseSeconds)
         {
-            for (int i = 0; i < _pawns.Count; i++)
+            for (int i = 0; i < pawns.Count; i++)
             {
-                _pawns[i].FixedUpdatingPawn(elapseSeconds);
+                pawns[i].FixedUpdatingPawn(elapseSeconds);
             }
         }
 
@@ -50,9 +50,9 @@ namespace CGame
         /// </summary>
         public override void Update(float elapseSeconds)
         {
-            for (int i = 0; i < _pawns.Count; i++)
+            for (int i = 0; i < pawns.Count; i++)
             {
-                _pawns[i].UpdatingPawn(elapseSeconds);
+                pawns[i].UpdatingPawn(elapseSeconds);
             }
         }
 
@@ -61,9 +61,9 @@ namespace CGame
         /// </summary>
         public override void LateUpdate(float elapseSeconds)
         {
-            for (int i = 0; i < _pawns.Count; i++)
+            for (int i = 0; i < pawns.Count; i++)
             {
-                _pawns[i].LateUpdatingPawn(elapseSeconds);
+                pawns[i].LateUpdatingPawn(elapseSeconds);
             }
         }
 
@@ -72,12 +72,12 @@ namespace CGame
         /// </summary>
         public override void Shutdown()
         {
-            for (int i = 0; i < _pawns.Count; i++)
+            for (int i = 0; i < pawns.Count; i++)
             {
-                _pawns[i].ShuttingDownPawn();
+                pawns[i].ShuttingDownPawn();
             }
 
-            _pawns.Clear();
+            pawns.Clear();
         }
     }
 }

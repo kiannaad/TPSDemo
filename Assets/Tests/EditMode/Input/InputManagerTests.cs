@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -259,6 +260,42 @@ namespace CGame.Tests
             UpdateInputManager();
         }
 
+        [Test]
+        public void PlayerMovementInput_ReachesMovementComponentVelocity()
+        {
+            InputHandle playerHandle = inputManager.GetHandle(InputType.Player);
+            Press(keyboard.wKey);
+            Press(keyboard.dKey);
+            UpdateInputManager();
+
+            Type pawnType = RequireRuntimeType("CGame.Pawn");
+            Type controllerType = RequireRuntimeType("CGame.PlayerController");
+            Type movementType = RequireRuntimeType("CGame.MovementComp");
+            object pawn = Activator.CreateInstance(pawnType);
+            object controller = Activator.CreateInstance(controllerType);
+            object movement = Activator.CreateInstance(movementType);
+
+            pawnType.GetMethod("RegisteringComponent").Invoke(pawn, new[] { movement });
+            controllerType.GetMethod("PossessingPawn").Invoke(controller, new[] { pawn });
+            Func<PlayerInputState> stateProvider = () => playerHandle.GetState<PlayerInputState>();
+            controllerType.GetMethod("SettingInputStateProvider").Invoke(controller, new object[] { stateProvider });
+            controllerType.GetMethod("UpdatingController").Invoke(controller, new object[] { 0.1f });
+
+            object[] velocityArguments = { Vector3.zero, 0.1f };
+            movementType.GetMethod("UpdateVelocity").Invoke(movement, velocityArguments);
+            Vector3 velocity = (Vector3)velocityArguments[0];
+
+            float expectedAxisVelocity = 20f * 0.1f / Mathf.Sqrt(2f);
+            Assert.AreEqual(expectedAxisVelocity, velocity.x, 0.0001f);
+            Assert.AreEqual(0f, velocity.y, 0.0001f);
+            Assert.AreEqual(expectedAxisVelocity, velocity.z, 0.0001f);
+
+            object[] consumedArguments = { velocity, 0.1f };
+            movementType.GetMethod("UpdateVelocity").Invoke(movement, consumedArguments);
+            Vector3 brakingVelocity = (Vector3)consumedArguments[0];
+            Assert.Less(brakingVelocity.magnitude, velocity.magnitude);
+        }
+
         /// <summary>
         /// 验证 Vehicle 输入方案下的转向按键能正常写入输入快照。
         /// </summary>
@@ -380,6 +417,13 @@ namespace CGame.Tests
         {
             Assert.AreEqual(expectedX, actual.x, 0.0001f);
             Assert.AreEqual(expectedY, actual.y, 0.0001f);
+        }
+
+        private static Type RequireRuntimeType(string typeName)
+        {
+            Type type = Type.GetType($"{typeName}, Assembly-CSharp");
+            Assert.IsNotNull(type, $"找不到运行时类型 {typeName}");
+            return type;
         }
 
         private sealed class PlayerActionsCallbackCounter : PlayerInput.IPlayerActions

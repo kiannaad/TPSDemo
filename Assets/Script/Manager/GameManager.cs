@@ -6,13 +6,13 @@ namespace CGame
 {
     public class GameManager : MonoSingleton<GameManager>
     {
-        private static readonly LinkedList<IManager> s_managerList = new LinkedList<IManager>();
+        private static readonly LinkedList<IManager> managerList = new LinkedList<IManager>();
   
 
         public static IManager CreateManager(Type managerType)
         {
             // check Manager exsist
-            foreach (IManager m in s_managerList)
+            foreach (IManager m in managerList)
             {
                 if (m.GetType() == managerType)
                 {
@@ -27,7 +27,7 @@ namespace CGame
                 throw new Exception($"Can't Create {managerType}");
             }
 #endif
-            LinkedListNode<IManager> current = s_managerList.First;
+            LinkedListNode<IManager> current = managerList.First;
             while (current != null)
             {
                 if (manager.Priority > current.Value.Priority)
@@ -40,11 +40,11 @@ namespace CGame
 
             if (current != null)
             {
-                s_managerList.AddBefore(current, manager);
+                managerList.AddBefore(current, manager);
             }
             else
             {
-                s_managerList.AddLast(manager);
+                managerList.AddLast(manager);
             }
             manager.Init();
             return manager;
@@ -58,11 +58,11 @@ namespace CGame
 
         public static void DestoryManager(Type managerType)
         {
-            foreach (IManager manager in s_managerList)
+            foreach (IManager manager in managerList)
             {
                 if (manager.GetType() == managerType)
                 {
-                    s_managerList.Remove(manager);
+                    managerList.Remove(manager);
                     manager.Shutdown();
                     return;
                 }
@@ -72,7 +72,7 @@ namespace CGame
 
         private static IManager GetManager(Type managerType)
         {
-            foreach (IManager manager in s_managerList)
+            foreach (IManager manager in managerList)
             {
                 if (manager.GetType() == managerType)
                 {
@@ -86,7 +86,7 @@ namespace CGame
         void FixedUpdate()
         {
             float deltaTime = Time.fixedDeltaTime;
-            foreach (var manager in s_managerList)
+            foreach (IManager manager in managerList)
             {
                 manager.FixedUpdate(deltaTime);
             }
@@ -95,7 +95,7 @@ namespace CGame
         void Update()
         {
             float deltaTime = Time.deltaTime;
-            foreach (var manager in s_managerList)
+            foreach (IManager manager in managerList)
             {
                 manager.Update(deltaTime);
             }
@@ -104,7 +104,7 @@ namespace CGame
         private void LateUpdate()
         {
             float deltaTime = Time.deltaTime;
-            foreach (var manager in s_managerList)
+            foreach (IManager manager in managerList)
             {
                 manager.LateUpdate(deltaTime);
             }
@@ -112,12 +112,14 @@ namespace CGame
 
         public void OnDestroy()
         {
-            LinkedListNode<IManager> currentNode = s_managerList.Last; 
+            LinkedListNode<IManager> currentNode = managerList.Last;
             while (currentNode != null)
             {
                 currentNode.Value.Shutdown();
-                currentNode = currentNode.Previous;       // 移动到前一个节点
+                currentNode = currentNode.Previous;
             }
+
+            managerList.Clear();
         }
     }
 }

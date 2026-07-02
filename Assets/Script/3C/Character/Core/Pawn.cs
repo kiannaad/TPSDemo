@@ -5,11 +5,14 @@ namespace CGame
 {
     public class Pawn
     {
-        private readonly List<IComponent> _components = new List<IComponent>();
-        private Controller _controller;
-        private Vector3 _pendingMovementInput;
+        private readonly List<IComponent> components = new List<IComponent>();
+        private Controller controller;
+        private Vector3 pendingMovementInput;
+        private Vector3 pendingForce;
+        private Vector3 pendingImpulse;
+        private bool pendingJump;
 
-        public Controller Controller => _controller;
+        public Controller Controller => controller;
         public PawnHost Host { get; private set; }
         public Quaternion ControlRotation { get; private set; } = Quaternion.identity;
 
@@ -37,7 +40,7 @@ namespace CGame
         /// </summary>
         public virtual void SettingController(Controller controller)
         {
-            _controller = controller;
+            this.controller = controller;
         }
 
         /// <summary>
@@ -45,9 +48,9 @@ namespace CGame
         /// </summary>
         public virtual void ClearingController(Controller controller)
         {
-            if (_controller == controller)
+            if (this.controller == controller)
             {
-                _controller = null;
+                this.controller = null;
             }
         }
 
@@ -69,7 +72,7 @@ namespace CGame
                 return;
             }
 
-            _pendingMovementInput += worldDirection.normalized * scale;
+            pendingMovementInput += worldDirection.normalized * scale;
         }
 
         /// <summary>
@@ -77,9 +80,45 @@ namespace CGame
         /// </summary>
         public Vector3 ConsumingMovementInput()
         {
-            Vector3 movementInput = Vector3.ClampMagnitude(_pendingMovementInput, 1f);
-            _pendingMovementInput = Vector3.zero;
+            Vector3 movementInput = Vector3.ClampMagnitude(pendingMovementInput, 1f);
+            pendingMovementInput = Vector3.zero;
             return movementInput;
+        }
+
+        public void AddingForce(Vector3 force)
+        {
+            pendingForce += force;
+        }
+
+        public Vector3 ConsumingForce()
+        {
+            Vector3 force = pendingForce;
+            pendingForce = Vector3.zero;
+            return force;
+        }
+
+        public void AddingImpulse(Vector3 impulse)
+        {
+            pendingImpulse += impulse;
+        }
+
+        public Vector3 ConsumingImpulse()
+        {
+            Vector3 impulse = pendingImpulse;
+            pendingImpulse = Vector3.zero;
+            return impulse;
+        }
+
+        public void AddingJumpInput()
+        {
+            pendingJump = true;
+        }
+
+        public bool ConsumingJumpInput()
+        {
+            bool jump = pendingJump;
+            pendingJump = false;
+            return jump;
         }
 
         /// <summary>
@@ -87,12 +126,12 @@ namespace CGame
         /// </summary>
         public void RegisteringComponent(IComponent component)
         {
-            if (component == null || _components.Contains(component))
+            if (component == null || components.Contains(component))
             {
                 return;
             }
 
-            _components.Add(component);
+            components.Add(component);
             SortingComponents();
             component.InitializingComponent(this);
         }
@@ -102,7 +141,7 @@ namespace CGame
         /// </summary>
         public void UnregisteringComponent(IComponent component)
         {
-            if (!_components.Remove(component))
+            if (!components.Remove(component))
             {
                 return;
             }
@@ -115,9 +154,9 @@ namespace CGame
         /// </summary>
         public virtual void UpdatingPawn(float elapseSeconds)
         {
-            for (int i = 0; i < _components.Count; i++)
+            for (int i = 0; i < components.Count; i++)
             {
-                _components[i].UpdatingComponent(elapseSeconds);
+                components[i].UpdatingComponent(elapseSeconds);
             }
         }
 
@@ -126,9 +165,9 @@ namespace CGame
         /// </summary>
         public virtual void FixedUpdatingPawn(float elapseSeconds)
         {
-            for (int i = 0; i < _components.Count; i++)
+            for (int i = 0; i < components.Count; i++)
             {
-                _components[i].FixedUpdatingComponent(elapseSeconds);
+                components[i].FixedUpdatingComponent(elapseSeconds);
             }
         }
 
@@ -137,9 +176,9 @@ namespace CGame
         /// </summary>
         public virtual void LateUpdatingPawn(float elapseSeconds)
         {
-            for (int i = 0; i < _components.Count; i++)
+            for (int i = 0; i < components.Count; i++)
             {
-                _components[i].LateUpdatingComponent(elapseSeconds);
+                components[i].LateUpdatingComponent(elapseSeconds);
             }
         }
 
@@ -148,15 +187,18 @@ namespace CGame
         /// </summary>
         public virtual void ShuttingDownPawn()
         {
-            for (int i = 0; i < _components.Count; i++)
+            for (int i = 0; i < components.Count; i++)
             {
-                _components[i].ShuttingDownComponent();
+                components[i].ShuttingDownComponent();
             }
 
-            _components.Clear();
-            _controller = null;
+            components.Clear();
+            controller = null;
             Host = null;
-            _pendingMovementInput = Vector3.zero;
+            pendingMovementInput = Vector3.zero;
+            pendingForce = Vector3.zero;
+            pendingImpulse = Vector3.zero;
+            pendingJump = false;
         }
 
         /// <summary>
@@ -164,7 +206,7 @@ namespace CGame
         /// </summary>
         private void SortingComponents()
         {
-            _components.Sort((left, right) => right.Priority.CompareTo(left.Priority));
+            components.Sort((left, right) => right.Priority.CompareTo(left.Priority));
         }
     }
 }

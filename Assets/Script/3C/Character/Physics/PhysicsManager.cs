@@ -11,6 +11,33 @@ namespace CGame
     [DefaultExecutionOrder(-100)]
     public class PhysicsManager : IManager
     {
+        public override int Priority => 70;
+
+        public override void Init()
+        {
+            _instance = this;
+            if (Settings == null)
+            {
+                Settings = ScriptableObject.CreateInstance<CharacterPhysicsSettings>();
+            }
+
+            SetCharacterMotorsCapacity(Settings.MotorsListInitialCapacity);
+            SetCharacterPhysicsMoversCapacity(Settings.MoversListInitialCapacity);
+        }
+
+        public override void Shutdown()
+        {
+            CharacterMotors.Clear();
+            CharacterPhysicsMovers.Clear();
+            if (Settings != null)
+            {
+                UnityEngine.Object.Destroy(Settings);
+                Settings = null;
+            }
+
+            _instance = null;
+        }
+
         // 全局唯一系统实例；Motor 和 Mover 会通过 EnsureCreation 确保它存在。
         private static PhysicsManager _instance;
 

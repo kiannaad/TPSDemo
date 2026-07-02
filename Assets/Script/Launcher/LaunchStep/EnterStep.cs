@@ -7,22 +7,22 @@ namespace CGame
     /// </summary>
     public class EnterStep : ILaunchStep
     {
-        private bool _isDone = false;
+        private bool isDone;
 
         public void Enter()
         {
             //Debug.Log("[Launch] Entering EnterStep: Ready for login and game logic.");
 
-            GameManager.CreateManager(typeof(CGame.InputManager));
+            _ = GameManager.Instance;
             //Debug.Log("<color=cyan>[Game] System Ready. Showing Login Panel...</color>");
             
 
-            _isDone = true;
+            isDone = true;
         }
 
         public bool Update()
         {
-            return _isDone;
+            return isDone;
         }
 
         public void Exit()

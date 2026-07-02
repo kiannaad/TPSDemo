@@ -4,7 +4,7 @@ namespace CGame
 {
     public class ControllerManager : IManager
     {
-        private readonly List<IController> _controllers = new List<IController>();
+        private readonly List<IController> controllers = new List<IController>();
 
         public override int Priority => 90;
 
@@ -23,12 +23,12 @@ namespace CGame
         /// </summary>
         public void RegisteringController(IController controller)
         {
-            if (controller == null || _controllers.Contains(controller))
+            if (controller == null || controllers.Contains(controller))
             {
                 return;
             }
 
-            _controllers.Add(controller);
+            controllers.Add(controller);
         }
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace CGame
         /// </summary>
         public void UnregisteringController(IController controller)
         {
-            if (!_controllers.Remove(controller))
+            if (!controllers.Remove(controller))
             {
                 return;
             }
@@ -52,9 +52,9 @@ namespace CGame
         /// </summary>
         public TController GettingController<TController>() where TController : class, IController
         {
-            for (int i = 0; i < _controllers.Count; i++)
+            for (int i = 0; i < controllers.Count; i++)
             {
-                if (_controllers[i] is TController controller)
+                if (controllers[i] is TController controller)
                 {
                     return controller;
                 }
@@ -68,9 +68,9 @@ namespace CGame
         /// </summary>
         public override void Update(float elapseSeconds)
         {
-            for (int i = 0; i < _controllers.Count; i++)
+            for (int i = 0; i < controllers.Count; i++)
             {
-                _controllers[i].UpdatingController(elapseSeconds);
+                controllers[i].UpdatingController(elapseSeconds);
             }
         }
 
@@ -79,15 +79,15 @@ namespace CGame
         /// </summary>
         public override void Shutdown()
         {
-            for (int i = 0; i < _controllers.Count; i++)
+            for (int i = 0; i < controllers.Count; i++)
             {
-                if (_controllers[i] is Controller controller)
+                if (controllers[i] is Controller controller)
                 {
                     controller.UnpossessingPawn();
                 }
             }
 
-            _controllers.Clear();
+            controllers.Clear();
         }
     }
 }

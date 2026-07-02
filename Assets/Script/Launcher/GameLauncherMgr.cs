@@ -6,67 +6,67 @@ namespace CGame
 {
     public class GameLauncher : Singleton<GameLauncher>
     {
-        private Queue<ILaunchStep> _stepQueue = new Queue<ILaunchStep>();
-        private ILaunchStep _curStartFun = null;
-        private long _startTime = 0;
-        public long StartTime => _startTime;
+        private readonly Queue<ILaunchStep> stepQueue = new Queue<ILaunchStep>();
+        private ILaunchStep currentStep;
+        private long startTime;
+        public long StartTime => startTime;
 
         public void InitGameStep()
         {
-            _stepQueue.Enqueue(new PreSourceStep());
-            _stepQueue.Enqueue(new EnterStep());
+            stepQueue.Enqueue(new PreSourceStep());
+            stepQueue.Enqueue(new EnterStep());
+            stepQueue.Enqueue(new CharacterTestStep());
 
             // 记录当前时间戳
             DateTime utcNow = DateTime.UtcNow;
-            _startTime = ((DateTimeOffset)utcNow).ToUnixTimeMilliseconds();
+            startTime = ((DateTimeOffset)utcNow).ToUnixTimeMilliseconds();
         }
 
         public void ReturnLoginPanel()
         {
-            _stepQueue.Clear();
+            stepQueue.Clear();
             NextFun();
         }
 
         public void NextFun()
         {
-            if (_curStartFun == null)
+            if (currentStep == null)
             {
-                if (_stepQueue.Count > 0)
+                if (stepQueue.Count > 0)
                 {
-                    var nextFun = _stepQueue.Dequeue();
+                    ILaunchStep nextFun = stepQueue.Dequeue();
                     Debug.Log(
-                        $"进入{nextFun.GetType().FullName}时间: {((DateTimeOffset)DateTime.UtcNow).ToUnixTimeMilliseconds() - _startTime}");
+                        $"进入{nextFun.GetType().FullName}时间: {((DateTimeOffset)DateTime.UtcNow).ToUnixTimeMilliseconds() - startTime}");
                     nextFun.Enter();
-                    _curStartFun = nextFun;
+                    currentStep = nextFun;
                 }
             }
             else
             {
-                _curStartFun.Exit();
+                currentStep.Exit();
                 Debug.Log(
-                    $"退出{_curStartFun.GetType().FullName}时间: {((DateTimeOffset)DateTime.UtcNow).ToUnixTimeMilliseconds() - _startTime}");
-                if (_stepQueue.Count > 0)
+                    $"退出{currentStep.GetType().FullName}时间: {((DateTimeOffset)DateTime.UtcNow).ToUnixTimeMilliseconds() - startTime}");
+                if (stepQueue.Count > 0)
                 {
-                    var nextFun = _stepQueue.Dequeue();
+                    ILaunchStep nextFun = stepQueue.Dequeue();
                     nextFun.Enter();
-                    DateTime utcNow = DateTime.UtcNow;
                     Debug.Log(
-                        $"进入{nextFun.GetType().FullName}时间: {((DateTimeOffset)DateTime.UtcNow).ToUnixTimeMilliseconds() - _startTime}");
-                    _curStartFun = nextFun;
+                        $"进入{nextFun.GetType().FullName}时间: {((DateTimeOffset)DateTime.UtcNow).ToUnixTimeMilliseconds() - startTime}");
+                    currentStep = nextFun;
                 }
                 else
                 {
-                    _curStartFun = null;
+                    currentStep = null;
                 }
             }
         }
 
         public void Update()
         {
-            if (_curStartFun != null)
+            if (currentStep != null)
             {
                 // 检查步骤是否完成
-                if (_curStartFun.Update())
+                if (currentStep.Update())
                 {
                     // 执行下一个步骤
                     NextFun();
