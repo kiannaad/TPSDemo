@@ -1,0 +1,47 @@
+using System;
+using System.Collections.Generic;
+using Luban;
+using SimpleJSON;
+using UnityEngine;
+
+
+{{namespace_with_grace_begin __namespace}}
+public partial class {{__name}}
+{
+    private static Dictionary<Type, ITable> _tableMap;
+
+    public static T GetTable<T>() where T : ITable, new()
+    {
+        if (_tableMap[typeof(T)] == null)
+        {
+            _tableMap[typeof(T)] = new T();
+            _tableMap[typeof(T)].Init(LoadAllTables(typeof(T).Name));
+        }
+        return (T)_tableMap[typeof(T)];
+    }
+    
+    private static JSONNode LoadAllTables(string table_name)
+    {
+        string gameConfDir = "Data"; // Resources/Data目录
+        
+        // 加载TextAsset资源
+        var asset = Resources.Load<TextAsset>($"{gameConfDir}/{table_name}");
+    
+        if (asset == null)
+        {
+            Debug.LogError($"找不到配置表: {table_name}");
+            return new JSONObject();
+        }
+    
+        // 解析JSON
+        return JSONNode.Parse(asset.text);
+        
+    }
+}
+
+public interface ITable
+{
+    public void Init(JSONNode _buf);
+}
+
+{{namespace_with_grace_end __namespace}}

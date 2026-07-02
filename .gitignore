@@ -56,3 +56,16 @@ sysinfo.txt
 # Plugins ExampleProgram
 /Assets/KinematicCharacterController/
 /Assets/KinematicCharacterController.meta
+
+# Local project notes
+/Doc/
+
+# Local agent and Harness state
+/.claude/
+/.codex/
+/CHANGELOG.jsonl
+
+# Local server build and runtime outputs
+/server/bin/*.exe
+/example/**/*.exe
+/example/**/server.log
