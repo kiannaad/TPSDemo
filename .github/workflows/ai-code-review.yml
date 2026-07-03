@@ -28,7 +28,7 @@ jobs:
       - name: Run AI code reviewer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.AI_REVIEW_API_KEY || secrets.OPENAI_API_KEY }}
           AI_REVIEW_BASE_URL: ${{ secrets.AI_REVIEW_BASE_URL }}
           AI_REVIEW_MODEL: ${{ secrets.AI_REVIEW_MODEL || vars.AI_REVIEW_MODEL || 'gpt-4o-mini' }}
           PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || '' }}

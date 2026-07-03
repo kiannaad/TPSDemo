@@ -74,6 +74,19 @@ jobs:
               throw 'ProjectSettings/ProjectVersion.txt is missing.'
           }
 
+      - name: Validate Unity license configuration
+        shell: pwsh
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          $missing = @('UNITY_LICENSE', 'UNITY_EMAIL', 'UNITY_PASSWORD') |
+              Where-Object { [string]::IsNullOrWhiteSpace((Get-Item "Env:$_" -ErrorAction SilentlyContinue).Value) }
+          if ($missing.Count -gt 0) {
+              throw "ENABLE_UNITY_CI=true, but required secrets are missing: $($missing -join ', ')"
+          }
+
       - name: Run Unity tests
         id: tests
         uses: game-ci/unity-test-runner@v4
@@ -99,7 +112,7 @@ jobs:
   ci-summary:
     name: CI summary
     runs-on: ubuntu-latest
-    needs: [repository-checks]
+    needs: [repository-checks, unity-tests]
     if: always()
     steps:
       - name: Summarize enabled checks
@@ -108,9 +121,9 @@ jobs:
           UNITY_CI_ENABLED: ${{ vars.ENABLE_UNITY_CI }}
         run: |
           echo "## Project CI" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Repository checks: required" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repository checks: ${{ needs.repository-checks.result }}" >> "$GITHUB_STEP_SUMMARY"
           if [[ "$UNITY_CI_ENABLED" == "true" ]]; then
-            echo "- Unity tests: enabled" >> "$GITHUB_STEP_SUMMARY"
+            echo "- Unity tests: ${{ needs.unity-tests.result }}" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "- Unity tests: disabled; add Unity license secrets and set ENABLE_UNITY_CI=true to enable them." >> "$GITHUB_STEP_SUMMARY"
           fi

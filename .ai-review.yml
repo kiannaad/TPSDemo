@@ -12,6 +12,8 @@ limits:
 
 paths:
   ignore:
+    - "Doc/**"
+    - "tools/**"
     - ".git/**"
     - ".idea/**"
     - ".vscode/**"
