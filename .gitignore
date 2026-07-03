@@ -52,3 +52,7 @@ sysinfo.txt
 # Harness Automation System
 .harness/state.json
 .harness/backups/
+
+# External documentation and local tools
+/Doc/
+/tools/
