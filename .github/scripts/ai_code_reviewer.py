@@ -410,8 +410,9 @@ def call_ai(context: ReviewContext, files: list[dict[str, Any]], config: dict[st
             {"role": "user", "content": prompt},
         ],
     }
+    base_url = os.getenv("AI_REVIEW_BASE_URL", "https://api.openai.com/v1").rstrip("/")
     req = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
+        f"{base_url}/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         method="POST",
         headers={
