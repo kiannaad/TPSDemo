@@ -426,6 +426,8 @@ def call_ai(context: ReviewContext, files: list[dict[str, Any]], config: dict[st
     except urllib.error.HTTPError as exc:
         message = exc.read().decode("utf-8", errors="replace")
         return f"AI 审查调用失败：{exc.code} {message[:500]}", []
+    except (TimeoutError, urllib.error.URLError, OSError) as exc:
+        return f"AI 审查暂时不可用，本次仅保留确定性规则结果：{exc}", []
 
     content = data["choices"][0]["message"]["content"]
     try:
