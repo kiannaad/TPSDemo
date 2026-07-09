@@ -1,0 +1,24 @@
+{
+    "name": "CGame.Animation.Tests",
+    "rootNamespace": "CGame.Tests",
+    "references": [
+        "CGame.Animation",
+        "Kybernetik.Animancer"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
