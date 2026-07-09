@@ -57,6 +57,12 @@ sysinfo.txt
 /Assets/KinematicCharacterController/
 /Assets/KinematicCharacterController.meta
 
+# Package samples
+/Assets/Samples/
+/Assets/Samples.meta
+/Packages/com.kybernetik.animancer/Samples~/
+/Packages/com.kybernetik.animancer/Samples~.meta
+
 # Local project notes
 /Doc/
 
