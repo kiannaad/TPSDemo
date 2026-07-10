@@ -3,7 +3,6 @@ using UnityEngine;
 
 namespace CGame.Animation
 {
-    [CreateAssetMenu(fileName = "AnimationClipAsset", menuName = "CGame/Animation/Animation Clip Asset")]
     public class AnimationClipAsset : AnimationAssetBase
     {
         [SerializeField] private AnimationClip animationClip;
@@ -12,11 +11,7 @@ namespace CGame.Animation
         [SerializeField] private bool overrideNormalizedStartTime;
         [SerializeField] private float normalizedStartTime;
 
-        public AnimationClip AnimationClip
-        {
-            get => animationClip;
-            set => animationClip = value;
-        }
+        public AnimationClip AnimationClip => animationClip;
 
         public float FadeDuration
         {
@@ -50,13 +45,29 @@ namespace CGame.Animation
             return CreateClipTransition();
         }
 
+        public bool TryInitialize(AnimationClip clip)
+        {
+            if (animationClip != null || clip == null)
+            {
+                return false;
+            }
+
+            animationClip = clip;
+            return true;
+        }
+
         public ClipTransition CreateClipTransition()
+        {
+            return CreateClipTransition(1f);
+        }
+
+        public ClipTransition CreateClipTransition(float speedMultiplier)
         {
             var transition = new ClipTransition
             {
                 Clip = animationClip,
                 FadeDuration = fadeDuration,
-                Speed = speed,
+                Speed = speed * speedMultiplier,
             };
 
             if (overrideNormalizedStartTime)

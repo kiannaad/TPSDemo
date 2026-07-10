@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace CGame.Animation.Editor
 {
-    public class AnimationNotifyEditorWindow : EditorWindow
+    public class AnimationEditorWindow : EditorWindow
     {
         private const float TrackHeaderWidth = 180f;
         private const float FrameWidth = 64f;
@@ -48,17 +48,17 @@ namespace CGame.Animation.Editor
             ResizeEnd,
         }
 
-        [MenuItem("CGame/Animation/Notify Editor")]
-        public static AnimationNotifyEditorWindow Open()
+        [MenuItem("CGame/Animation/Animation Editor")]
+        public static AnimationEditorWindow Open()
         {
-            var window = GetWindow<AnimationNotifyEditorWindow>("Animation Notify");
+            var window = GetWindow<AnimationEditorWindow>("Animation Editor");
             window.SyncFromSelection();
             return window;
         }
 
-        public static AnimationNotifyEditorWindow Open(AnimationAssetBase asset)
+        public static AnimationEditorWindow Open(AnimationAssetBase asset)
         {
-            var window = GetWindow<AnimationNotifyEditorWindow>("Animation Notify");
+            var window = GetWindow<AnimationEditorWindow>("Animation Editor");
             window.SetAsset(asset);
             return window;
         }

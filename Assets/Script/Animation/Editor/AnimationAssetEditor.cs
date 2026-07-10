@@ -9,7 +9,14 @@ namespace CGame.Animation.Editor
     {
         public override void OnInspectorGUI()
         {
-            DrawDefaultInspector();
+            serializedObject.Update();
+            using (new EditorGUI.DisabledScope(true))
+            {
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("animationClip"));
+            }
+
+            DrawPropertiesExcluding(serializedObject, "m_Script", "animationClip");
+            serializedObject.ApplyModifiedProperties();
             DrawNotifyEditorButton();
         }
 
@@ -17,9 +24,9 @@ namespace CGame.Animation.Editor
         {
             using (new EditorGUI.DisabledScope(target == null))
             {
-                if (GUILayout.Button("Open Notify Editor"))
+                if (GUILayout.Button("Open Animation Editor"))
                 {
-                    AnimationNotifyEditorWindow.Open((AnimationAssetBase)target);
+                    AnimationEditorWindow.Open((AnimationAssetBase)target);
                 }
             }
         }
@@ -27,7 +34,23 @@ namespace CGame.Animation.Editor
 
     [CustomEditor(typeof(AnimationSequenceAsset))]
     [CanEditMultipleObjects]
-    public class AnimationSequenceAssetEditor : AnimationClipAssetEditor
+    public class AnimationSequenceAssetEditor : UnityEditor.Editor
     {
+        public override void OnInspectorGUI()
+        {
+            DrawDefaultInspector();
+            DrawNotifyEditorButton();
+        }
+
+        private void DrawNotifyEditorButton()
+        {
+            using (new EditorGUI.DisabledScope(target == null))
+            {
+                if (GUILayout.Button("Open Animation Editor"))
+                {
+                    AnimationEditorWindow.Open((AnimationAssetBase)target);
+                }
+            }
+        }
     }
 }

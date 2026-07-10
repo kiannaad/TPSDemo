@@ -14,7 +14,7 @@ namespace CGame.Tests
         {
             AnimationClip clip = new AnimationClip();
             AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
-            asset.AnimationClip = clip;
+            asset.TryInitialize(clip);
 
             ITransition transition = asset.CreateTransition();
 
@@ -27,14 +27,72 @@ namespace CGame.Tests
         public void SequenceAsset_CreatesPlayableClipTransition()
         {
             AnimationClip clip = new AnimationClip();
+            AnimationClipAsset clipAsset = ScriptableObject.CreateInstance<AnimationClipAsset>();
+            clipAsset.TryInitialize(clip);
             AnimationSequenceAsset asset = ScriptableObject.CreateInstance<AnimationSequenceAsset>();
-            asset.AnimationClip = clip;
+            asset.Clips = new[]
+            {
+                new AnimationSequenceAsset.SequenceEntry
+                {
+                    ClipAsset = clipAsset,
+                },
+            };
 
             ITransition transition = asset.CreateTransition();
 
             Assert.IsTrue(asset.IsValid);
-            Assert.IsInstanceOf<ClipTransition>(transition);
+            Assert.IsInstanceOf<ClipTransitionSequence>(transition);
             Assert.AreSame(clip, ((ClipTransition)transition).Clip);
+        }
+
+        [Test]
+        public void ClipAsset_DoesNotRebindAnimationClipAfterInitialization()
+        {
+            AnimationClip firstClip = new AnimationClip();
+            AnimationClip secondClip = new AnimationClip();
+            AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
+
+            bool initialized = asset.TryInitialize(firstClip);
+            bool rebound = asset.TryInitialize(secondClip);
+
+            Assert.IsTrue(initialized);
+            Assert.IsFalse(rebound);
+            Assert.AreSame(firstClip, asset.AnimationClip);
+        }
+
+        [Test]
+        public void SequenceAsset_CreatesTransitionSequenceFromClipAssets()
+        {
+            AnimationClip firstClip = new AnimationClip();
+            AnimationClip secondClip = new AnimationClip();
+            AnimationClipAsset firstAsset = ScriptableObject.CreateInstance<AnimationClipAsset>();
+            AnimationClipAsset secondAsset = ScriptableObject.CreateInstance<AnimationClipAsset>();
+            firstAsset.TryInitialize(firstClip);
+            secondAsset.TryInitialize(secondClip);
+            secondAsset.Speed = 1.5f;
+            AnimationSequenceAsset sequence = ScriptableObject.CreateInstance<AnimationSequenceAsset>();
+            sequence.Clips = new[]
+            {
+                new AnimationSequenceAsset.SequenceEntry
+                {
+                    ClipAsset = firstAsset,
+                    Speed = 0.5f,
+                },
+                new AnimationSequenceAsset.SequenceEntry
+                {
+                    ClipAsset = secondAsset,
+                    Speed = 2f,
+                },
+            };
+
+            ClipTransitionSequence transition = sequence.CreateSequenceTransition();
+
+            Assert.IsTrue(sequence.IsValid);
+            Assert.AreSame(firstClip, transition.Clip);
+            Assert.AreEqual(1, transition.Others.Length);
+            Assert.AreSame(secondClip, transition.Others[0].Clip);
+            Assert.AreEqual(0.5f, transition.Speed);
+            Assert.AreEqual(3f, transition.Others[0].Speed);
         }
 
         [Test]
@@ -44,8 +102,8 @@ namespace CGame.Tests
             AnimationClip moveClip = new AnimationClip();
             AnimationClipAsset idle = ScriptableObject.CreateInstance<AnimationClipAsset>();
             AnimationClipAsset move = ScriptableObject.CreateInstance<AnimationClipAsset>();
-            idle.AnimationClip = idleClip;
-            move.AnimationClip = moveClip;
+            idle.TryInitialize(idleClip);
+            move.TryInitialize(moveClip);
 
             TwoDimensionalAnimationBlendAsset blend = ScriptableObject.CreateInstance<TwoDimensionalAnimationBlendAsset>();
             blend.Children = new[]
@@ -82,7 +140,7 @@ namespace CGame.Tests
                 AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
                 AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
                 AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
-                asset.AnimationClip = new AnimationClip();
+                asset.TryInitialize(new AnimationClip());
                 player.Animancer = animancer;
                 player.AnimationAsset = asset;
 
@@ -106,7 +164,7 @@ namespace CGame.Tests
                 gameObject.AddComponent<Animator>();
                 AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
                 AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
-                asset.AnimationClip = new AnimationClip();
+                asset.TryInitialize(new AnimationClip());
 
                 AnimancerState state = animancer.Play(asset);
 
@@ -159,17 +217,17 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void NotifyEditorWindow_DisablesEditingWhenClipIsMissing()
+        public void AnimationEditorWindow_DisablesEditingWhenClipIsMissing()
         {
             AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
                 Assert.AreSame(asset, window.EditingAsset);
                 Assert.IsFalse(window.CanEditSelectedAsset);
 
-                asset.AnimationClip = new AnimationClip();
+                asset.TryInitialize(new AnimationClip());
 
                 Assert.IsTrue(window.CanEditSelectedAsset);
             }
@@ -188,11 +246,11 @@ namespace CGame.Tests
             bool handled = AnimationAssetOpenHandler.OnOpenAsset(instanceId, 0);
 
             Assert.IsTrue(handled);
-            EditorWindow.GetWindow<AnimationNotifyEditorWindow>().Close();
+            EditorWindow.GetWindow<AnimationEditorWindow>().Close();
         }
 
         [Test]
-        public void NotifyEditorWindow_ClampsPreviewFrameToClipLength()
+        public void AnimationEditorWindow_ClampsPreviewFrameToClipLength()
         {
             AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
             AnimationClip clip = new AnimationClip
@@ -200,8 +258,8 @@ namespace CGame.Tests
                 frameRate = 10f,
             };
             clip.SetCurve("", typeof(Transform), "localPosition.x", AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            asset.AnimationClip = clip;
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            asset.TryInitialize(clip);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
@@ -230,10 +288,10 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void NotifyEditorWindow_AddsNotifyEventsToSelectedTrack()
+        public void AnimationEditorWindow_AddsNotifyEventsToSelectedTrack()
         {
             AnimationClipAsset asset = CreateEditableClipAsset();
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
@@ -258,10 +316,10 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void NotifyEditorWindow_AddsNotifyStateWithDefaultDuration()
+        public void AnimationEditorWindow_AddsNotifyStateWithDefaultDuration()
         {
             AnimationClipAsset asset = CreateEditableClipAsset();
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
@@ -283,10 +341,10 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void NotifyEditorWindow_DisablesTrackAndEventCreationWithoutClip()
+        public void AnimationEditorWindow_DisablesTrackAndEventCreationWithoutClip()
         {
             AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
@@ -302,10 +360,10 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void NotifyEditorWindow_TimelineZoomChangesFrameCoordinateMapping()
+        public void AnimationEditorWindow_TimelineZoomChangesFrameCoordinateMapping()
         {
             AnimationClipAsset asset = CreateEditableClipAsset();
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
@@ -329,10 +387,10 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void NotifyEditorWindow_RemoveSelectedTrackClampsSelection()
+        public void AnimationEditorWindow_RemoveSelectedTrackClampsSelection()
         {
             AnimationClipAsset asset = CreateEditableClipAsset();
-            AnimationNotifyEditorWindow window = AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow window = AnimationEditorWindow.Open(asset);
 
             try
             {
@@ -360,7 +418,7 @@ namespace CGame.Tests
                 frameRate = 10f,
             };
             clip.SetCurve("", typeof(Transform), "localPosition.x", AnimationCurve.Linear(0f, 0f, 1f, 1f));
-            asset.AnimationClip = clip;
+            asset.TryInitialize(clip);
             return asset;
         }
     }

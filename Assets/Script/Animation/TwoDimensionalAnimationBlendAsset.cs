@@ -103,7 +103,7 @@ namespace CGame.Animation
             for (int i = 0; i < childCount; i++)
             {
                 BlendChild child = children[i];
-                animations[i] = child?.ClipAsset?.AnimationClip;
+                animations[i] = child?.ClipAsset?.MainClip;
                 thresholds[i] = child != null ? child.Threshold : default;
                 speeds[i] = child != null ? child.Speed : 1f;
                 synchronizeChildren[i] = child == null || child.Synchronize;

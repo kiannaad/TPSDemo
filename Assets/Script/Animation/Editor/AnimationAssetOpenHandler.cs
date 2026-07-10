@@ -13,7 +13,7 @@ namespace CGame.Animation.Editor
                 return false;
             }
 
-            AnimationNotifyEditorWindow.Open(asset);
+            AnimationEditorWindow.Open(asset);
             return true;
         }
     }
