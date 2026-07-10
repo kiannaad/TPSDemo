@@ -9,6 +9,7 @@ namespace CGame.Animation
         [SerializeReference] private AnimationNotify notify = new AnimationInstantNotify();
         [SerializeField, Min(0)] private int startFrame;
         [SerializeField, Min(0)] private int durationFrames;
+        [SerializeField, Min(0f)] private float minTriggerWeight = 0.00001f;
 
         public AnimationNotify Notify
         {
@@ -26,6 +27,12 @@ namespace CGame.Animation
         {
             get => durationFrames;
             set => durationFrames = Mathf.Max(0, value);
+        }
+
+        public float MinTriggerWeight
+        {
+            get => minTriggerWeight;
+            set => minTriggerWeight = Mathf.Max(0f, value);
         }
 
         public bool IsDuration => durationFrames > 0 || notify is AnimationDurationNotify;

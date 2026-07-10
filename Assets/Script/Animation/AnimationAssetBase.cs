@@ -13,7 +13,7 @@ namespace CGame.Animation
         public abstract bool IsValid { get; }
         public IReadOnlyList<AnimationNotifyTrack> NotifyTracks => notifyTracks;
 
-        public bool CanEditNotifies => MainClip != null;
+        public virtual bool CanEditNotifies => MainClip != null;
 
         public abstract ITransition CreateTransition();
 
@@ -25,6 +25,18 @@ namespace CGame.Animation
             };
 
             notifyTracks.Add(track);
+            return track;
+        }
+
+        public AnimationNotifyTrack InsertNotifyTrack(int index, string trackName = "Notify Track")
+        {
+            int insertIndex = Mathf.Clamp(index, 0, notifyTracks.Count);
+            var track = new AnimationNotifyTrack
+            {
+                Name = trackName,
+            };
+
+            notifyTracks.Insert(insertIndex, track);
             return track;
         }
 

@@ -43,6 +43,8 @@ namespace CGame.Animation
         public override AnimationClip MainClip
             => clips != null && clips.Length > 0 ? clips[0]?.ClipAsset?.MainClip : null;
 
+        public override bool CanEditNotifies => false;
+
         public override bool IsValid
         {
             get
