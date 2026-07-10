@@ -63,6 +63,10 @@ sysinfo.txt
 /Packages/com.kybernetik.animancer/Samples~/
 /Packages/com.kybernetik.animancer/Samples~.meta
 
+# Local animation asset packs
+/Assets/VanillaLoopStudio/
+/Assets/VanillaLoopStudio.meta
+
 # Local project notes
 /Doc/
 
