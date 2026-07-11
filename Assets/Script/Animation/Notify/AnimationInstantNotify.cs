@@ -5,5 +5,8 @@ namespace CGame.Animation
     [Serializable]
     public class AnimationInstantNotify : AnimationNotify
     {
+        public virtual void OnNotify(AnimationEventContext context)
+        {
+        }
     }
 }

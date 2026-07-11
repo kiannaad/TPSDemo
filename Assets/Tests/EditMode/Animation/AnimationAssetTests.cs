@@ -181,6 +181,249 @@ namespace CGame.Tests
 
                 Assert.IsNotNull(state);
                 Assert.AreSame(asset.AnimationClip, state.MainObject);
+                Assert.IsNotNull(player.NotifyRuntime);
+                Assert.AreSame(asset, player.NotifyRuntime.ClipAsset);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationAssetPlayer_DispatchesNotifyAroundManualEvaluate()
+        {
+            GameObject gameObject = new GameObject("AnimationAssetPlayerNotifyRuntimeTickTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                AnimationClipAsset asset = CreateEditableClipAsset();
+                asset.FadeDuration = 0f;
+                var notify = new CountingInstantNotify();
+                asset.AddNotifyTrack("Footsteps").AddEvent(notify, 2);
+                player.Animancer = animancer;
+                player.AnimationAsset = asset;
+
+                AnimancerState state = player.Play();
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.Time = 0.25f;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0.25f);
+
+                Assert.AreEqual(1, notify.NotifyCount);
+                Assert.AreSame(animancer, notify.LastContext.AnimancerComponent);
+                Assert.AreSame(gameObject, notify.LastContext.OwnerGameObject);
+                Assert.AreSame(player.NotifyRuntime.AnimancerState, notify.LastContext.AnimancerState);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationAssetPlayer_DoesNotRepeatNotifyWhenEvaluateDoesNotAdvance()
+        {
+            GameObject gameObject = new GameObject("AnimationAssetPlayerNotifyRuntimeNoAdvanceTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                AnimationClipAsset asset = CreateEditableClipAsset();
+                asset.FadeDuration = 0f;
+                var notify = new CountingInstantNotify();
+                asset.AddNotifyTrack("Footsteps").AddEvent(notify, 2);
+                player.Animancer = animancer;
+                player.AnimationAsset = asset;
+
+                AnimancerState state = player.Play();
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.Time = 0.25f;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0.25f);
+
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0f);
+
+                Assert.AreEqual(1, notify.NotifyCount);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationAssetPlayer_EndsActiveDurationWhenStateStopsWithoutTimeAdvance()
+        {
+            GameObject gameObject = new GameObject("AnimationAssetPlayerNotifyRuntimeStoppedNoAdvanceTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                AnimationClipAsset asset = CreateEditableClipAsset();
+                asset.FadeDuration = 0f;
+                var notify = new CountingDurationNotify();
+                asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+                player.Animancer = animancer;
+                player.AnimationAsset = asset;
+
+                AnimancerState state = player.Play();
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.Time = 0.25f;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0.25f);
+
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.IsPlaying = false;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0f);
+
+                Assert.AreEqual(1, notify.BeginCount);
+                Assert.AreEqual(1, notify.EndCount);
+                Assert.AreEqual(AnimationNotifyEndReason.StateStopped, notify.LastEndReason);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationAssetPlayer_DispatchesOwnerReceiverNotifyThroughRuntime()
+        {
+            GameObject gameObject = new GameObject("AnimationAssetPlayerOwnerReceiverTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                var receiver = gameObject.AddComponent<RecordingNotifyReceiver>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                AnimationClipAsset asset = CreateEditableClipAsset();
+                asset.FadeDuration = 0f;
+                var notify = new CountingInstantNotify
+                {
+                    DispatchPolicy = AnimationNotifyDispatchPolicy.OwnerReceiver,
+                    EventTag = "AnimEvent.Footstep",
+                };
+                asset.AddNotifyTrack("Footsteps").AddEvent(notify, 2);
+                player.Animancer = animancer;
+                player.AnimationAsset = asset;
+
+                AnimancerState state = player.Play();
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.Time = 0.25f;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0.25f);
+
+                Assert.AreEqual(0, notify.NotifyCount);
+                Assert.AreEqual(1, receiver.ReceiveCount);
+                Assert.AreEqual("AnimEvent.Footstep", receiver.LastContext.EventTag);
+                Assert.AreSame(gameObject, receiver.LastContext.OwnerGameObject);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationAssetPlayer_EndsActiveDurationNotifyWhenDisabled()
+        {
+            GameObject gameObject = new GameObject("AnimationAssetPlayerDisableCleanupTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                AnimationClipAsset asset = CreateEditableClipAsset();
+                asset.FadeDuration = 0f;
+                var notify = new CountingDurationNotify();
+                asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+                player.Animancer = animancer;
+                player.AnimationAsset = asset;
+
+                AnimancerState state = player.Play();
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.Time = 0.25f;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0.25f);
+
+                typeof(AnimationAssetPlayer)
+                    .GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(player, null);
+
+                Assert.AreEqual(1, notify.BeginCount);
+                Assert.AreEqual(1, notify.EndCount);
+                Assert.AreEqual(AnimationNotifyEndReason.OwnerDisabled, notify.LastEndReason);
+                Assert.IsNull(player.NotifyRuntime);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationAssetPlayer_PlayingNewAssetInterruptsOldDurationNotify()
+        {
+            GameObject gameObject = new GameObject("AnimationAssetPlayerSwitchCleanupTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                AnimationClipAsset firstAsset = CreateEditableClipAsset();
+                AnimationClipAsset secondAsset = CreateEditableClipAsset();
+                firstAsset.FadeDuration = 0f;
+                secondAsset.FadeDuration = 0f;
+                var notify = new CountingDurationNotify();
+                firstAsset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+                player.Animancer = animancer;
+                player.AnimationAsset = firstAsset;
+
+                AnimancerState state = player.Play();
+                player.CaptureNotifyBeforeEvaluateForTesting();
+                state.Time = 0.25f;
+                animancer.Evaluate(0f);
+                player.DispatchNotifyAfterEvaluateForTesting(0.25f);
+                player.AnimationAsset = secondAsset;
+                player.Play();
+
+                Assert.AreEqual(1, notify.BeginCount);
+                Assert.AreEqual(1, notify.EndCount);
+                Assert.AreEqual(AnimationNotifyEndReason.Interrupted, notify.LastEndReason);
+                Assert.AreSame(secondAsset, player.NotifyRuntime.ClipAsset);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimancerComponent_CreateNotifyRuntimeProvidesManualIntegrationPath()
+        {
+            GameObject gameObject = new GameObject("AnimancerComponentNotifyRuntimeExtensionTest");
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimationClipAsset asset = CreateEditableClipAsset();
+                asset.FadeDuration = 0f;
+                AnimancerState state = animancer.Play(asset);
+
+                AnimationNotifyRuntime runtime = animancer.CreateNotifyRuntime(gameObject, asset, state);
+
+                Assert.IsNotNull(runtime);
+                Assert.AreSame(gameObject, runtime.Owner);
+                Assert.AreSame(asset, runtime.ClipAsset);
+                Assert.AreSame(state, runtime.AnimancerState);
             }
             finally
             {
@@ -202,8 +445,8 @@ namespace CGame.Tests
         public void AnimationClipAssetFactory_CreatesPersistentAssetBoundToSourceClip()
         {
             const string folderPath = "Assets/Temp/AnimationAssetTests";
-            Directory.CreateDirectory(folderPath);
-            AssetDatabase.Refresh();
+            EnsureAssetFolder("Assets", "Temp");
+            EnsureAssetFolder("Assets/Temp", "AnimationAssetTests");
             string clipPath = AssetDatabase.GenerateUniqueAssetPath($"{folderPath}/FactorySource.anim");
             string createdPath = null;
 
@@ -227,11 +470,12 @@ namespace CGame.Tests
             {
                 if (!string.IsNullOrEmpty(createdPath))
                 {
-                    AssetDatabase.DeleteAsset(createdPath);
+                AssetDatabase.DeleteAsset(createdPath);
                 }
 
                 AssetDatabase.DeleteAsset(clipPath);
                 AssetDatabase.DeleteAsset(folderPath);
+                DeleteAssetFolderIfEmpty("Assets/Temp");
             }
         }
 
@@ -239,8 +483,8 @@ namespace CGame.Tests
         public void AnimationClipAsset_PersistsEditedNotifyData()
         {
             const string folderPath = "Assets/Temp/AnimationAssetTests";
-            Directory.CreateDirectory(folderPath);
-            AssetDatabase.Refresh();
+            EnsureAssetFolder("Assets", "Temp");
+            EnsureAssetFolder("Assets/Temp", "AnimationAssetTests");
             string clipPath = AssetDatabase.GenerateUniqueAssetPath($"{folderPath}/PersistentSource.anim");
             string assetPath = AssetDatabase.GenerateUniqueAssetPath($"{folderPath}/PersistentClipAsset.asset");
 
@@ -276,6 +520,7 @@ namespace CGame.Tests
                 AssetDatabase.DeleteAsset(assetPath);
                 AssetDatabase.DeleteAsset(clipPath);
                 AssetDatabase.DeleteAsset(folderPath);
+                DeleteAssetFolderIfEmpty("Assets/Temp");
             }
         }
 
@@ -372,6 +617,439 @@ namespace CGame.Tests
             Assert.IsFalse(instant.IsDuration);
             Assert.IsTrue(duration.IsDuration);
             Assert.AreEqual(13, duration.EndFrame);
+        }
+
+        [Test]
+        public void AnimationNotify_StoresSemanticTagsAndExplicitDispatchPolicy()
+        {
+            var notify = new AnimationInstantNotify
+            {
+                EventTag = " AnimEvent.Footstep ",
+                DispatchPolicy = AnimationNotifyDispatchPolicy.OwnerReceiver,
+            };
+            notify.SetContextTags(new[] { " Surface.Concrete ", "", "MoveState.Run" });
+
+            string json = JsonUtility.ToJson(notify);
+            AnimationInstantNotify loaded = JsonUtility.FromJson<AnimationInstantNotify>(json);
+
+            Assert.AreEqual("AnimEvent.Footstep", loaded.EventTag);
+            Assert.AreEqual(AnimationNotifyDispatchPolicy.OwnerReceiver, loaded.DispatchPolicy);
+            Assert.AreEqual(2, loaded.ContextTags.Count);
+            Assert.AreEqual("Surface.Concrete", loaded.ContextTags[0]);
+            Assert.AreEqual("MoveState.Run", loaded.ContextTags[1]);
+        }
+
+        [Test]
+        public void AnimationNotify_DefaultsToDirectNotifyWithoutImplicitBroadcast()
+        {
+            var notify = new AnimationInstantNotify();
+
+            Assert.AreEqual(string.Empty, notify.EventTag);
+            Assert.AreEqual(0, notify.ContextTags.Count);
+            Assert.AreEqual(AnimationNotifyDispatchPolicy.DirectNotify, notify.DispatchPolicy);
+        }
+
+        [Test]
+        public void AnimationEventContext_CapturesOwnerAnimationEventAndSpatialData()
+        {
+            GameObject gameObject = new GameObject("AnimationEventContextTest");
+            GameObject attachObject = new GameObject("AnimationEventAttachPoint");
+
+            try
+            {
+                Animator animator = gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                gameObject.transform.position = new Vector3(1f, 2f, 3f);
+                attachObject.transform.position = new Vector3(4f, 5f, 6f);
+                attachObject.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
+                AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
+                asset.TryInitialize(new AnimationClip());
+                var notify = new AnimationInstantNotify
+                {
+                    EventTag = "AnimEvent.Weapon.Swing",
+                };
+                notify.SetContextTags(new[] { "Weapon.Sword" });
+                var notifyEvent = new AnimationNotifyEvent
+                {
+                    Notify = notify,
+                    StartFrame = 8,
+                };
+
+                var context = new AnimationEventContext(
+                    gameObject,
+                    animancer,
+                    null,
+                    asset,
+                    notifyEvent,
+                    0.5f,
+                    0.016f,
+                    0.8f,
+                    attachObject.transform,
+                    "RightHand");
+
+                Assert.AreSame(gameObject, context.Owner);
+                Assert.AreSame(gameObject, context.OwnerGameObject);
+                Assert.AreSame(gameObject.transform, context.OwnerTransform);
+                Assert.AreSame(animator, context.Animator);
+                Assert.AreSame(animancer, context.AnimancerComponent);
+                Assert.AreSame(asset, context.AnimationAsset);
+                Assert.AreSame(notifyEvent, context.NotifyEvent);
+                Assert.AreEqual("AnimEvent.Weapon.Swing", context.EventTag);
+                Assert.AreEqual("Weapon.Sword", context.ContextTags[0]);
+                Assert.AreEqual(0.5f, context.NormalizedTime);
+                Assert.AreEqual(0.016f, context.DeltaTime);
+                Assert.AreEqual(0.8f, context.Weight);
+                Assert.AreEqual(attachObject.transform.position, context.Position);
+                Assert.AreEqual(attachObject.transform.rotation, context.Rotation);
+                Assert.AreSame(attachObject.transform, context.AttachPoint);
+                Assert.AreEqual("RightHand", context.BoneOrSocketName);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(attachObject);
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationNotifyLifecycleEntries_AreRuntimeHooksWithoutAssetState()
+        {
+            var context = new AnimationEventContext(null, null, null, null, null, 0.25f, 0.016f, 1f);
+            var instant = new CountingInstantNotify();
+            var duration = new CountingDurationNotify();
+
+            instant.OnNotify(context);
+            duration.OnBegin(context);
+            duration.OnTick(context);
+            duration.OnEnd(context, AnimationNotifyEndReason.Interrupted);
+
+            Assert.AreEqual(1, instant.NotifyCount);
+            Assert.AreEqual(1, duration.BeginCount);
+            Assert.AreEqual(1, duration.TickCount);
+            Assert.AreEqual(1, duration.EndCount);
+            Assert.AreEqual(AnimationNotifyEndReason.Interrupted, duration.LastEndReason);
+            Assert.IsFalse(typeof(AnimationNotifyEvent).GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                .Any(field => field.Name.Contains("active", StringComparison.OrdinalIgnoreCase) || field.Name.Contains("runtime", StringComparison.OrdinalIgnoreCase)));
+        }
+
+        [Test]
+        public void AnimationNotifyEndReason_ContainsRequiredCleanupReasons()
+        {
+            Assert.IsTrue(Enum.IsDefined(typeof(AnimationNotifyEndReason), AnimationNotifyEndReason.NaturalEnd));
+            Assert.IsTrue(Enum.IsDefined(typeof(AnimationNotifyEndReason), AnimationNotifyEndReason.Interrupted));
+            Assert.IsTrue(Enum.IsDefined(typeof(AnimationNotifyEndReason), AnimationNotifyEndReason.WeightBelowThreshold));
+            Assert.IsTrue(Enum.IsDefined(typeof(AnimationNotifyEndReason), AnimationNotifyEndReason.OwnerDisabled));
+            Assert.IsTrue(Enum.IsDefined(typeof(AnimationNotifyEndReason), AnimationNotifyEndReason.StateStopped));
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_DispatchesInstantNotifyWhenPlaybackCrossesEventFrame()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            AnimationNotifyTrack track = asset.AddNotifyTrack("Footsteps");
+            var notify = new CountingInstantNotify
+            {
+                EventTag = "AnimEvent.Footstep",
+            };
+            track.AddEvent(notify, 2);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.1f, 0.1f, 1f);
+            runtime.Tick(0.2f, 0.1f, 1f);
+
+            Assert.AreEqual(1, notify.NotifyCount);
+            Assert.AreSame(asset, runtime.ClipAsset);
+            Assert.AreEqual(0.1f, runtime.LastTime);
+            Assert.AreEqual(0.2f, runtime.CurrentTime);
+            Assert.AreEqual("AnimEvent.Footstep", notify.LastContext.EventTag);
+            Assert.AreEqual(0.2f, notify.LastContext.NormalizedTime);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_DispatchesInstantNotifyWhenSingleTickSkipsAcrossFrame()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingInstantNotify();
+            asset.AddNotifyTrack("Weapon").AddEvent(notify, 5);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.6f, 0.6f, 1f);
+
+            Assert.AreEqual(1, notify.NotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_DoesNotRepeatInstantNotifyOutsideCrossedInterval()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingInstantNotify();
+            asset.AddNotifyTrack("Weapon").AddEvent(notify, 3);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.4f, 0.4f, 1f);
+            runtime.Tick(0.5f, 0.1f, 1f);
+
+            Assert.AreEqual(1, notify.NotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_DoesNotRepeatInstantNotifyWhenTimeStopsAfterEvaluate()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingInstantNotify();
+            asset.AddNotifyTrack("Weapon").AddEvent(notify, 3);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.4f, 0.4f, 1f);
+            runtime.Tick(0.4f, 0f, 1f);
+
+            Assert.AreEqual(1, notify.NotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_RepeatsInstantNotifyOnForwardLoop()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingInstantNotify();
+            asset.AddNotifyTrack("Footsteps").AddEvent(notify, 2);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.25f, 0.25f, 1f);
+            runtime.Tick(1.25f, 1f, 1f);
+            runtime.Tick(2.25f, 1f, 1f);
+
+            Assert.AreEqual(3, notify.NotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_SkipsInstantNotifyBelowMinTriggerWeight()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingInstantNotify();
+            AnimationNotifyEvent notifyEvent = asset.AddNotifyTrack("Footsteps").AddEvent(notify, 3);
+            notifyEvent.MinTriggerWeight = 0.5f;
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.4f, 0.4f, 0.25f);
+
+            Assert.AreEqual(0, notify.NotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_DispatchesOwnerReceiverPolicyToOwner()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingInstantNotify
+            {
+                DispatchPolicy = AnimationNotifyDispatchPolicy.OwnerReceiver,
+                EventTag = "AnimEvent.Weapon.Swing",
+            };
+            asset.AddNotifyTrack("Weapon").AddEvent(notify, 4);
+            GameObject gameObject = new GameObject("AnimationNotifyRuntimeOwnerReceiverTest");
+
+            try
+            {
+                var receiver = gameObject.AddComponent<RecordingNotifyReceiver>();
+                var runtime = new AnimationNotifyRuntime(gameObject, asset);
+
+                runtime.Tick(0.5f, 0.5f, 1f);
+
+                Assert.AreEqual(0, notify.NotifyCount);
+                Assert.AreEqual(1, receiver.ReceiveCount);
+                Assert.AreSame(gameObject, receiver.LastContext.OwnerGameObject);
+                Assert.AreEqual("AnimEvent.Weapon.Swing", receiver.LastContext.EventTag);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_IgnoresEmptyTracksAndMissingAsset()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            asset.AddNotifyTrack("Empty");
+            var runtime = new AnimationNotifyRuntime(null, asset);
+            var missingAssetRuntime = new AnimationNotifyRuntime(null, null);
+
+            Assert.DoesNotThrow(() => runtime.Tick(0.5f, 0.5f, 1f));
+            Assert.DoesNotThrow(() => missingAssetRuntime.Tick(0.5f, 0.5f, 1f));
+            Assert.AreEqual(0, runtime.ActiveNotifyCount);
+            Assert.AreEqual(0, missingAssetRuntime.ActiveNotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_RunsDurationNotifyBeginTickAndNaturalEnd()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 3);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.25f, 0.25f, 1f);
+            runtime.Tick(0.4f, 0.15f, 1f);
+            runtime.Tick(0.5f, 0.1f, 1f);
+
+            Assert.AreEqual(1, notify.BeginCount);
+            Assert.AreEqual(2, notify.TickCount);
+            Assert.AreEqual(1, notify.EndCount);
+            Assert.AreEqual(AnimationNotifyEndReason.NaturalEnd, notify.LastEndReason);
+            Assert.AreEqual(0, runtime.ActiveNotifyCount);
+            Assert.AreSame(asset, notify.LastBeginContext.AnimationAsset);
+            Assert.AreSame(asset, notify.LastEndContext.AnimationAsset);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_RepeatsDurationNotifyOnForwardLoop()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 3);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.25f, 0.25f, 1f);
+            runtime.Tick(0.5f, 0.25f, 1f);
+            runtime.Tick(1.25f, 0.75f, 1f);
+            runtime.Tick(1.5f, 0.25f, 1f);
+
+            Assert.AreEqual(2, notify.BeginCount);
+            Assert.AreEqual(2, notify.EndCount);
+            Assert.AreEqual(AnimationNotifyEndReason.NaturalEnd, notify.LastEndReason);
+            Assert.AreEqual(0, runtime.ActiveNotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_DoesNotBeginDurationNotifyBelowMinTriggerWeight()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            AnimationNotifyEvent notifyEvent = asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 3);
+            notifyEvent.MinTriggerWeight = 0.6f;
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.25f, 0.25f, 0.5f);
+
+            Assert.AreEqual(0, notify.BeginCount);
+            Assert.AreEqual(0, notify.TickCount);
+            Assert.AreEqual(0, runtime.ActiveNotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_EndsActiveDurationNotifyWhenWeightDropsBelowThreshold()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            AnimationNotifyEvent notifyEvent = asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+            notifyEvent.MinTriggerWeight = 0.6f;
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.25f, 0.25f, 0.8f);
+            runtime.Tick(0.35f, 0.1f, 0.5f);
+
+            Assert.AreEqual(1, notify.BeginCount);
+            Assert.AreEqual(1, notify.TickCount);
+            Assert.AreEqual(1, notify.EndCount);
+            Assert.AreEqual(AnimationNotifyEndReason.WeightBelowThreshold, notify.LastEndReason);
+            Assert.AreEqual(0, runtime.ActiveNotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_EndAllInterruptsActiveDurationNotify()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+            var runtime = new AnimationNotifyRuntime(null, asset);
+
+            runtime.Tick(0.25f, 0.25f, 1f);
+            runtime.EndAll(AnimationNotifyEndReason.Interrupted);
+
+            Assert.AreEqual(1, notify.BeginCount);
+            Assert.AreEqual(1, notify.EndCount);
+            Assert.AreEqual(AnimationNotifyEndReason.Interrupted, notify.LastEndReason);
+            Assert.AreEqual(0, runtime.ActiveNotifyCount);
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_EndsActiveDurationNotifyWhenOwnerDisabled()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+            GameObject gameObject = new GameObject("AnimationNotifyRuntimeOwnerDisabledTest");
+
+            try
+            {
+                var runtime = new AnimationNotifyRuntime(gameObject, asset);
+                runtime.Tick(0.25f, 0.25f, 1f);
+
+                gameObject.SetActive(false);
+                runtime.Tick(0.35f, 0.1f, 1f);
+
+                Assert.AreEqual(1, notify.BeginCount);
+                Assert.AreEqual(1, notify.EndCount);
+                Assert.AreEqual(AnimationNotifyEndReason.OwnerDisabled, notify.LastEndReason);
+                Assert.AreEqual(0, runtime.ActiveNotifyCount);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_EndsActiveDurationNotifyWhenStateStopped()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+            GameObject gameObject = new GameObject("AnimationNotifyRuntimeStateStoppedTest");
+
+            try
+            {
+                gameObject.AddComponent<Animator>();
+                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                AnimancerState state = animancer.Play(asset);
+                var runtime = new AnimationNotifyRuntime(gameObject, asset, state, animancer);
+                runtime.Tick(0.25f, 0.25f, 1f);
+
+                state.IsPlaying = false;
+                runtime.Tick(0.35f, 0.1f, 1f);
+
+                Assert.AreEqual(1, notify.BeginCount);
+                Assert.AreEqual(1, notify.EndCount);
+                Assert.AreEqual(AnimationNotifyEndReason.StateStopped, notify.LastEndReason);
+                Assert.AreEqual(0, runtime.ActiveNotifyCount);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void AnimationNotifyRuntime_KeepsDurationStateIsolatedPerRuntimeInstance()
+        {
+            AnimationClipAsset asset = CreateEditableClipAsset();
+            var notify = new CountingDurationNotify();
+            asset.AddNotifyTrack("Trail").AddEvent(notify, 2, 5);
+            var firstRuntime = new AnimationNotifyRuntime(null, asset);
+            var secondRuntime = new AnimationNotifyRuntime(null, asset);
+
+            firstRuntime.Tick(0.25f, 0.25f, 1f);
+            secondRuntime.Tick(0.25f, 0.25f, 1f);
+            firstRuntime.EndAll(AnimationNotifyEndReason.Interrupted);
+
+            Assert.AreEqual(2, notify.BeginCount);
+            Assert.AreEqual(1, notify.EndCount);
+            Assert.AreEqual(0, firstRuntime.ActiveNotifyCount);
+            Assert.AreEqual(1, secondRuntime.ActiveNotifyCount);
+
+            secondRuntime.EndAll(AnimationNotifyEndReason.Interrupted);
+
+            Assert.AreEqual(2, notify.EndCount);
+            Assert.AreEqual(0, secondRuntime.ActiveNotifyCount);
         }
 
         [Test]
@@ -929,9 +1607,83 @@ namespace CGame.Tests
             return asset;
         }
 
+        private static void DeleteAssetFolderIfEmpty(string folderPath)
+        {
+            string absoluteFolderPath = Path.GetFullPath(folderPath);
+            if (!Directory.Exists(absoluteFolderPath) || Directory.EnumerateFileSystemEntries(absoluteFolderPath).Any())
+            {
+                return;
+            }
+
+            AssetDatabase.DeleteAsset(folderPath);
+        }
+
+        private static void EnsureAssetFolder(string parentPath, string folderName)
+        {
+            string folderPath = $"{parentPath}/{folderName}";
+            if (!AssetDatabase.IsValidFolder(folderPath))
+            {
+                AssetDatabase.CreateFolder(parentPath, folderName);
+            }
+        }
+
         private class LabelledInstantNotify : AnimationInstantNotify
         {
             [SerializeField] private string eventName = "Foot Plant Left";
+        }
+
+        private class CountingInstantNotify : AnimationInstantNotify
+        {
+            public int NotifyCount { get; private set; }
+            public AnimationEventContext LastContext { get; private set; }
+
+            public override void OnNotify(AnimationEventContext context)
+            {
+                NotifyCount++;
+                LastContext = context;
+            }
+        }
+
+        private class CountingDurationNotify : AnimationDurationNotify
+        {
+            public int BeginCount { get; private set; }
+            public int TickCount { get; private set; }
+            public int EndCount { get; private set; }
+            public AnimationNotifyEndReason LastEndReason { get; private set; }
+            public AnimationEventContext LastBeginContext { get; private set; }
+            public AnimationEventContext LastTickContext { get; private set; }
+            public AnimationEventContext LastEndContext { get; private set; }
+
+            public override void OnBegin(AnimationEventContext context)
+            {
+                BeginCount++;
+                LastBeginContext = context;
+            }
+
+            public override void OnTick(AnimationEventContext context)
+            {
+                TickCount++;
+                LastTickContext = context;
+            }
+
+            public override void OnEnd(AnimationEventContext context, AnimationNotifyEndReason reason)
+            {
+                EndCount++;
+                LastEndReason = reason;
+                LastEndContext = context;
+            }
+        }
+
+        private class RecordingNotifyReceiver : MonoBehaviour, IAnimationNotifyReceiver
+        {
+            public int ReceiveCount { get; private set; }
+            public AnimationEventContext LastContext { get; private set; }
+
+            public void OnAnimationNotify(AnimationEventContext context)
+            {
+                ReceiveCount++;
+                LastContext = context;
+            }
         }
     }
 }

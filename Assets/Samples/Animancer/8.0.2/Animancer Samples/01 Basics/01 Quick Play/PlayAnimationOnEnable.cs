@@ -4,6 +4,7 @@
 
 using CGame.Animation;
 using UnityEngine;
+using UnityEngine.Playables;
 
 namespace Animancer.Samples.Basics
 {
@@ -27,12 +28,26 @@ namespace Animancer.Samples.Basics
         /************************************************************************************************************************/
         [SerializeField] private AnimationClipAsset animation;
         [SerializeField] private AnimancerComponent animancer;
+        private AnimationNotifyRuntime notifyRuntime;
 
         /************************************************************************************************************************/
 
         protected virtual void OnEnable()
         {
-            animancer.Play(animation);
+            AnimancerState state = animancer.Play(animation);
+            animancer.Graph.UpdateMode = DirectorUpdateMode.Manual;
+            notifyRuntime = animancer.CreateNotifyRuntime(gameObject, animation, state);
+        }
+
+        protected virtual void Update()
+        {
+            notifyRuntime?.EvaluateWithNotify(Time.deltaTime);
+        }
+
+        protected virtual void OnDisable()
+        {
+            notifyRuntime?.EndAll(AnimationNotifyEndReason.OwnerDisabled);
+            notifyRuntime = null;
         }
 
         /************************************************************************************************************************/
