@@ -29,6 +29,58 @@ namespace CGame.Tests
         }
 
         [Test]
+        public void ClipNode_LoopingNodeWrapsTimeAfterClipEnd()
+        {
+            using (var fixture = new GraphFixture())
+            {
+                var node = new ClipNode(CreateClip());
+
+                node.Initialize(fixture.Context);
+                Assert.IsTrue(double.IsPositiveInfinity(node.ClipPlayable.GetDuration()));
+                node.ClipPlayable.SetTime(1.25d);
+                node.Update(fixture.Context, 0.016f);
+
+                Assert.AreEqual(0.25d, node.ClipPlayable.GetTime(), 0.001d);
+                Assert.IsFalse(node.ClipPlayable.IsDone());
+            }
+        }
+
+        [Test]
+        public void ClipNode_OneShotKeepsTimeAfterClipEnd()
+        {
+            using (var fixture = new GraphFixture())
+            {
+                var node = new ClipNode(CreateClip()) { Loop = false };
+
+                node.Initialize(fixture.Context);
+                Assert.AreEqual(node.Clip.length, node.ClipPlayable.GetDuration(), 0.001d);
+                node.ClipPlayable.SetTime(1.25d);
+                node.Update(fixture.Context, 0.016f);
+
+                Assert.AreEqual(1.25d, node.ClipPlayable.GetTime(), 0.001d);
+            }
+        }
+
+        [Test]
+        public void AnimationState_EnteringAgainRestartsCompletedOneShot()
+        {
+            using (var fixture = new GraphFixture())
+            {
+                var node = new ClipNode(CreateClip()) { Loop = false };
+                node.Initialize(fixture.Context);
+                var state = new CGame.Animation.AnimationState("JumpStart", node);
+                node.ClipPlayable.SetTime(node.Clip.length);
+                node.ClipPlayable.SetDone(true);
+
+                state.Enter(fixture.Context);
+
+                Assert.AreEqual(0d, node.ClipPlayable.GetTime(), 0.001d);
+                Assert.IsFalse(node.ClipPlayable.IsDone());
+                Assert.AreEqual(PlayState.Playing, node.ClipPlayable.GetPlayState());
+            }
+        }
+
+        [Test]
         public void Blend1DNode_ConnectsChildrenAndWeightsNearestSegment()
         {
             using (var fixture = new GraphFixture())

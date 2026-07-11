@@ -73,6 +73,25 @@ namespace CGame.Tests
         }
 
         [UnityTest]
+        public IEnumerator HoldingLeftInput_RotatesRuntimeCharacterTowardMovement()
+        {
+            GameObject character = GameObject.Find("RuntimeCharacter");
+            Assert.IsNotNull(character);
+
+            Press(keyboard.aKey);
+            for (int i = 0; i < 10; i++)
+            {
+                yield return null;
+                yield return new WaitForFixedUpdate();
+            }
+            Release(keyboard.aKey);
+            yield return null;
+
+            Assert.Greater(Vector3.Dot(character.transform.forward, Vector3.left), 0.9f);
+            LogAssert.NoUnexpectedReceived();
+        }
+
+        [UnityTest]
         public IEnumerator PressingSpace_JumpsAndReturnsToGround()
         {
             GameObject character = GameObject.Find("RuntimeCharacter");
@@ -99,6 +118,47 @@ namespace CGame.Tests
             Assert.AreEqual(groundHeight, character.transform.position.y, 0.05f);
             LogAssert.NoUnexpectedReceived();
         }
+
+        [UnityTest]
+        public IEnumerator JumpRenderTrajectory_HasNoSingleFrameVerticalPop()
+        {
+            GameObject character = GameObject.Find("RuntimeCharacter");
+            Assert.IsNotNull(character);
+            Animator animator = character.GetComponentInChildren<Animator>();
+            Assert.IsNotNull(animator);
+            Transform hips = animator.GetBoneTransform(HumanBodyBones.Hips);
+            Assert.IsNotNull(hips);
+
+            for (int i = 0; i < 3; i++)
+            {
+                yield return null;
+            }
+
+            float previousCharacterY = character.transform.position.y;
+            float previousHipsY = hips.position.y;
+            float largestCharacterStep = 0f;
+            float largestHipsStep = 0f;
+            Press(keyboard.spaceKey);
+            yield return null;
+            Release(keyboard.spaceKey);
+
+            for (int i = 0; i < 120; i++)
+            {
+                yield return null;
+                float characterStep = character.transform.position.y - previousCharacterY;
+                float hipsStep = hips.position.y - previousHipsY;
+                largestCharacterStep = Mathf.Max(largestCharacterStep, characterStep);
+                largestHipsStep = Mathf.Max(largestHipsStep, hipsStep);
+                previousCharacterY = character.transform.position.y;
+                previousHipsY = hips.position.y;
+            }
+
+            TestContext.WriteLine($"Largest root step: {largestCharacterStep:F4}; largest hips step: {largestHipsStep:F4}");
+            Assert.Less(largestCharacterStep, 0.2f);
+            Assert.Less(largestHipsStep, 0.2f);
+            LogAssert.NoUnexpectedReceived();
+        }
+
     }
 
     public class LaunchCharacterMovementRuntimeTests : InputTestFixture

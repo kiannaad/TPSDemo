@@ -24,6 +24,8 @@ namespace CGame.Animation
             if (pose.Playable.IsValid())
             {
                 pose.Playable.SetTime(0d);
+                pose.Playable.SetDone(false);
+                pose.Playable.Play();
             }
 
             phaseReporter?.Invoke(Name, LocomotionStatePhase.Enter);

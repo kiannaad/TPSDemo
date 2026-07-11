@@ -26,6 +26,20 @@ namespace CGame.Animation
             return new AnimationPoseHandle(clipPlayable, 1f, context.EvaluateFrameId, nameof(ClipNode));
         }
 
+        public override void Update(AnimationGraphContext context, float deltaTime)
+        {
+            if (!Loop || !clipPlayable.IsValid() || clip.length <= 0f)
+            {
+                return;
+            }
+
+            double time = clipPlayable.GetTime();
+            if (time >= clip.length)
+            {
+                clipPlayable.SetTime(time % clip.length);
+            }
+        }
+
         public override AnimationNodeDebugSnapshot GetDebugSnapshot()
         {
             return new AnimationNodeDebugSnapshot(nameof(ClipNode), clipPlayable.IsValid(), 1f, 0);
@@ -40,7 +54,7 @@ namespace CGame.Animation
 
             clipPlayable = AnimationClipPlayable.Create(context.Graph, clip);
             clipPlayable.SetSpeed(Speed);
-            clipPlayable.SetDuration(clip.length);
+            clipPlayable.SetDuration(Loop ? double.PositiveInfinity : clip.length);
             clipPlayable.SetTime(0d);
             clipPlayable.SetApplyFootIK(false);
         }

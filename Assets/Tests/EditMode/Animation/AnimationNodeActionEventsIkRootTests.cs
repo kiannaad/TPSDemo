@@ -79,6 +79,57 @@ namespace CGame.Tests
         }
 
         [Test]
+        public void FootIkNode_ProjectsBothFeetOntoGroundWhenGrounded()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Art/Animation/FemaleLocomotionSet/Prefabs/Robot Kyle.prefab");
+            AnimationClipAsset idle = LoadAsset("Assets/Art/Animation/LocomotionAsset/InPlace/A_INP_IdleClipAsset.asset");
+            GameObject robot = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            OutputNode output = null;
+            try
+            {
+                ground.transform.position = new Vector3(0f, -0.5f, 0f);
+                ground.transform.localScale = new Vector3(10f, 1f, 10f);
+                Physics.SyncTransforms();
+                Animator animator = robot.GetComponentInChildren<Animator>();
+                Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+                Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+                var footIk = new FootIkNode(new ClipNode(idle.AnimationClip), animator, leftFoot, rightFoot);
+                output = new OutputNode(footIk, "FootIkGroundProjectionTest");
+                output.Initialize(animator);
+                output.Context.IsGrounded = true;
+
+                output.Update(0.1f);
+
+                FootIkJob job = footIk.ScriptPlayable.GetJobData<FootIkJob>();
+                Assert.Greater(footIk.LeftWeight, 0.5f);
+                Assert.Greater(footIk.RightWeight, 0.5f);
+                Assert.AreEqual(0.08f, job.LeftPosition.y, 0.05f);
+                Assert.AreEqual(0.08f, job.RightPosition.y, 0.05f);
+            }
+            finally
+            {
+                output?.Destroy();
+                UnityEngine.Object.DestroyImmediate(ground);
+                UnityEngine.Object.DestroyImmediate(robot);
+            }
+        }
+
+        [Test]
+        public void FootIkJob_ReleasesRaisedSwingFootButKeepsContactFootPlanted()
+        {
+            Vector3 target = new Vector3(0f, 0.08f, 0f);
+
+            float planted = FootIkJob.CalculateContactWeight(target, target, Vector3.up, 0.03f, 0.12f);
+            float blending = FootIkJob.CalculateContactWeight(target + Vector3.up * 0.075f, target, Vector3.up, 0.03f, 0.12f);
+            float raised = FootIkJob.CalculateContactWeight(target + Vector3.up * 0.2f, target, Vector3.up, 0.03f, 0.12f);
+
+            Assert.AreEqual(1f, planted, 0.001f);
+            Assert.AreEqual(0.5f, blending, 0.001f);
+            Assert.AreEqual(0f, raised, 0.001f);
+        }
+
+        [Test]
         public void RootDeltaNode_OutputsCapturedDeltaWithoutMovingOwnerTransform()
         {
             using (var fixture = new GraphFixture())

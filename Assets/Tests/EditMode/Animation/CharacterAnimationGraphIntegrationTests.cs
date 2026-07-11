@@ -27,10 +27,10 @@ namespace CGame.Tests
                 Assert.AreEqual("Move", instance.Graph.CurrentLocomotionState);
 
                 Update(instance, new Vector3(0f, 5f, 1f), false);
-                Assert.AreEqual("JumpStart", instance.Graph.CurrentLocomotionState);
+                Assert.AreEqual("Air", instance.Graph.CurrentLocomotionState);
 
                 Update(instance, new Vector3(0f, -2f, 1f), false);
-                Assert.AreEqual("Fall", instance.Graph.CurrentLocomotionState);
+                Assert.AreEqual("Air", instance.Graph.CurrentLocomotionState);
                 Assert.AreEqual(-2f, instance.FrameData.WorldVelocity.y);
 
                 Update(instance, Vector3.zero, true);

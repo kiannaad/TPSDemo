@@ -24,10 +24,9 @@ namespace CGame.Animation
             {
                 new AnimationState("Idle", new ClipNode(config.Idle.AnimationClip)),
                 new AnimationState("Move", move),
-                new AnimationState("Stop", new ClipNode(config.Stop.AnimationClip)),
-                new AnimationState("JumpStart", new ClipNode(config.JumpStart.AnimationClip)),
-                new AnimationState("Fall", new ClipNode(config.InAir.AnimationClip)),
-                new AnimationState("Land", new ClipNode(config.Land.AnimationClip)),
+                new AnimationState("Stop", CreateOneShot(config.Stop.AnimationClip)),
+                new AnimationState("Air", new ClipNode(config.InAir.AnimationClip)),
+                new AnimationState("Land", CreateOneShot(config.Land.AnimationClip)),
             };
             AnimationStateTransition[] transitions =
             {
@@ -35,10 +34,8 @@ namespace CGame.Animation
                 new AnimationStateTransition("Move", "Stop", context => context.IsGrounded && context.MoveSpeed <= 0.1f),
                 new AnimationStateTransition("Stop", "Move", context => context.IsGrounded && context.MoveSpeed > 0.1f, 10),
                 new AnimationStateTransition("Stop", "Idle", context => context.IsGrounded && context.MoveSpeed <= 0.1f),
-                new AnimationStateTransition(string.Empty, "JumpStart", context => context.IsJumping, 100, 0.08f),
-                new AnimationStateTransition(string.Empty, "Fall", context => !context.IsGrounded && context.IsFalling, 90, 0.12f),
-                new AnimationStateTransition("JumpStart", "Fall", context => context.IsFalling, 110, 0.08f),
-                new AnimationStateTransition("Fall", "Land", context => context.IsGrounded, 120, 0.08f),
+                new AnimationStateTransition(string.Empty, "Air", context => !context.IsGrounded, 100, 0.08f),
+                new AnimationStateTransition("Air", "Land", context => context.IsGrounded, 120, 0.08f),
                 new AnimationStateTransition("Land", "Move", context => context.IsGrounded && context.MoveSpeed > 0.1f, 10, 0.1f),
                 new AnimationStateTransition("Land", "Idle", context => context.IsGrounded && context.MoveSpeed <= 0.1f, 0, 0.1f),
             };
@@ -65,6 +62,13 @@ namespace CGame.Animation
                 leftHandTarget.transform.SetParent(animator.transform, true);
                 leftHandTarget.transform.SetPositionAndRotation(leftHand.position, leftHand.rotation);
                 root = new LeftHandIkNode(root, leftHand, leftHandTarget.transform);
+            }
+
+            Transform leftFoot = animator.GetBoneTransform(HumanBodyBones.LeftFoot);
+            Transform rightFoot = animator.GetBoneTransform(HumanBodyBones.RightFoot);
+            if (leftFoot != null && rightFoot != null)
+            {
+                root = new FootIkNode(root, animator, leftFoot, rightFoot);
             }
 
             root = new RootDeltaNode(root);
@@ -106,6 +110,11 @@ namespace CGame.Animation
             {
                 inertializationNode?.Request(0.12f);
             }
+        }
+
+        private static ClipNode CreateOneShot(AnimationClip clip)
+        {
+            return new ClipNode(clip) { Loop = false };
         }
     }
 }

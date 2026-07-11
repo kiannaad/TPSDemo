@@ -85,6 +85,14 @@ namespace CGame
             return movementInput;
         }
 
+        /// <summary>
+        /// 查看当前累计移动输入，但不消费它。
+        /// </summary>
+        public Vector3 PeekingMovementInput()
+        {
+            return Vector3.ClampMagnitude(pendingMovementInput, 1f);
+        }
+
         public void AddingForce(Vector3 force)
         {
             pendingForce += force;
