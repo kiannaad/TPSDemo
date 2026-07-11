@@ -61,6 +61,7 @@ namespace CGame.Animation
             job.RightWeight = rightWeight;
             job.FullContactHeight = Mathf.Max(0f, FullContactHeight);
             job.ReleaseHeight = Mathf.Max(job.FullContactHeight, ReleaseHeight);
+            job.MaxCorrection = Mathf.Max(0f, MaxCorrection);
             scriptPlayable.SetJobData(job);
         }
 
@@ -92,6 +93,7 @@ namespace CGame.Animation
                 RightNormal = Vector3.up,
                 FullContactHeight = FullContactHeight,
                 ReleaseHeight = ReleaseHeight,
+                MaxCorrection = MaxCorrection,
             };
             scriptPlayable = AnimationScriptPlayable.Create(context.Graph, job, 1);
             context.Graph.Connect(inputNode.Evaluate(context).Playable, 0, scriptPlayable, 0);
@@ -118,9 +120,7 @@ namespace CGame.Animation
             if (hasGround)
             {
                 Vector3 desiredPosition = hit.point + hit.normal * FootHeight;
-                float penetration = Vector3.Dot(desiredPosition - foot.position, hit.normal);
-                Vector3 correction = hit.normal * Mathf.Clamp(penetration, 0f, MaxCorrection);
-                targetPosition = foot.position + correction;
+                targetPosition = desiredPosition;
                 groundNormal = hit.normal;
                 Vector3 forward = Vector3.ProjectOnPlane(foot.forward, hit.normal);
                 if (forward.sqrMagnitude <= 0.0001f)

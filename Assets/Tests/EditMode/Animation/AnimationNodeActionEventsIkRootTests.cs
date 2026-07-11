@@ -130,6 +130,19 @@ namespace CGame.Tests
         }
 
         [Test]
+        public void FootIkJob_CorrectsOnlyPosePenetrationWithoutReusingPreviousFootPosition()
+        {
+            Vector3 groundTarget = new Vector3(4f, 0.08f, 6f);
+            Vector3 currentPose = new Vector3(5f, 0f, 7f);
+
+            Vector3 goal = FootIkJob.CalculateGoalPosition(currentPose, groundTarget, Vector3.up, 0.25f);
+
+            Assert.AreEqual(currentPose.x, goal.x, 0.001f);
+            Assert.AreEqual(0.08f, goal.y, 0.001f);
+            Assert.AreEqual(currentPose.z, goal.z, 0.001f);
+        }
+
+        [Test]
         public void RootDeltaNode_OutputsCapturedDeltaWithoutMovingOwnerTransform()
         {
             using (var fixture = new GraphFixture())
