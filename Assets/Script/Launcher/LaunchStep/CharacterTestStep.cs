@@ -1,4 +1,5 @@
 using UnityEngine;
+using CGame.Animation;
 
 namespace CGame
 {
@@ -7,13 +8,15 @@ namespace CGame
         private const string RuntimeRootName = "[CharacterTestRuntime]";
 
         private GameObject runtimeRoot;
+        private Character runtimeCharacter;
+        private PawnManager pawnManager;
 
         public void Enter()
         {
             _ = GameManager.Instance;
             InputManager inputManager = GameManager.GetManager<InputManager>();
             ControllerManager controllerManager = GameManager.GetManager<ControllerManager>();
-            PawnManager pawnManager = GameManager.GetManager<PawnManager>();
+            pawnManager = GameManager.GetManager<PawnManager>();
             GameManager.GetManager<PhysicsManager>();
 
             runtimeRoot = new GameObject(RuntimeRootName);
@@ -21,22 +24,31 @@ namespace CGame
             CreatingLight(runtimeRoot.transform);
             CreatingGround(runtimeRoot.transform);
 
-            GameObject characterObject = CreatingCharacter(runtimeRoot.transform);
+            CharacterAnimationConfig animationConfig = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
+            if (animationConfig == null || !animationConfig.IsValid)
+            {
+                throw new System.InvalidOperationException("CharacterAnimationConfig is missing or invalid.");
+            }
+
+            GameObject characterObject = CreatingCharacter(runtimeRoot.transform, animationConfig, out Animator animator);
             PawnHost pawnHost = characterObject.AddComponent<PawnHost>();
             CharacterPhysicsMotor motor = characterObject.AddComponent<CharacterPhysicsMotor>();
 
-            Character pawn = new Character();
+            runtimeCharacter = new Character();
             MovementComp movementComp = new MovementComp();
             movementComp.BindingMotor(motor);
-            pawn.RegisteringComponent(movementComp);
-            pawnHost.BindingPawn(pawn);
-            pawnManager.RegisteringPawn(pawn);
+            pawnHost.MeshRoot = animator.transform;
+            pawnHost.Animator = animator;
+            pawnHost.BindingPawn(runtimeCharacter);
+            runtimeCharacter.RegisteringComponent(movementComp);
+            runtimeCharacter.RegisteringComponent(new CharacterAnimationComponent(animator, motor, movementComp, animationConfig));
+            pawnManager.RegisteringPawn(runtimeCharacter);
             motor.CharacterController = movementComp;
 
             PlayerController playerController = controllerManager.CreatingController<PlayerController>();
             InputHandle playerInput = inputManager.GetHandle(InputType.Player);
             playerController.SettingInputHandle(playerInput);
-            playerController.PossessingPawn(pawn);
+            playerController.PossessingPawn(runtimeCharacter);
 
             Debug.Log("[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
         }
@@ -48,6 +60,13 @@ namespace CGame
 
         public void Exit()
         {
+            if (runtimeCharacter != null && pawnManager != null)
+            {
+                pawnManager.UnregisteringPawn(runtimeCharacter);
+                runtimeCharacter = null;
+            }
+
+            pawnManager = null;
             if (runtimeRoot != null)
             {
                 Object.Destroy(runtimeRoot);
@@ -55,16 +74,30 @@ namespace CGame
             }
         }
 
-        private static GameObject CreatingCharacter(Transform parent)
+        private static GameObject CreatingCharacter(
+            Transform parent,
+            CharacterAnimationConfig animationConfig,
+            out Animator animator)
         {
             GameObject character = new GameObject("RuntimeCharacter");
             character.transform.SetParent(parent);
 
-            GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            visual.name = "Visual";
+            GameObject visual = Object.Instantiate(animationConfig.CharacterPrefab);
+            visual.name = "CharacterVisual";
             visual.transform.SetParent(character.transform);
-            visual.transform.localPosition = Vector3.up;
-            Object.Destroy(visual.GetComponent<Collider>());
+            visual.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+            foreach (Collider collider in visual.GetComponentsInChildren<Collider>())
+            {
+                Object.Destroy(collider);
+            }
+
+            animator = visual.GetComponentInChildren<Animator>();
+            if (animator == null)
+            {
+                throw new System.InvalidOperationException("Configured character prefab does not contain an Animator.");
+            }
+
+            animator.applyRootMotion = false;
 
             return character;
         }

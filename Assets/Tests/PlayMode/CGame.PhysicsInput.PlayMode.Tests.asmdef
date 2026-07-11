@@ -3,6 +3,8 @@
   "rootNamespace": "CGame.Tests",
   "references": [
     "CGame.Input",
+    "CGame.Animation",
+    "YooAsset",
     "Unity.InputSystem",
     "Unity.InputSystem.TestFramework"
   ],
