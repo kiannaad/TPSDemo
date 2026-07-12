@@ -3,11 +3,11 @@ using UnityEngine;
 
 namespace CGame
 {
-    public class Pawn
+    public class Pawn : ICharacterIntentSink, ICharacterMovementCommandSource
     {
         private readonly List<IComponent> components = new List<IComponent>();
         private Controller controller;
-        private Vector3 pendingMovementInput;
+        private Vector3 movementInput;
         private Vector3 pendingForce;
         private Vector3 pendingImpulse;
         private bool pendingJump;
@@ -63,34 +63,39 @@ namespace CGame
         }
 
         /// <summary>
-        /// 累加移动输入。
+        /// 提交一次控制意图。移动是最新持续值，跳跃是一次性请求。
         /// </summary>
-        public virtual void AddingMovementInput(Vector3 worldDirection, float scale)
+        public void SubmitControlIntent(in CharacterControlIntent intent)
         {
-            if (worldDirection == Vector3.zero || Mathf.Approximately(scale, 0f))
-            {
-                return;
-            }
-
-            pendingMovementInput += worldDirection.normalized * scale;
+            movementInput = intent.MovementInput;
+            pendingJump |= intent.JumpRequested;
         }
 
         /// <summary>
-        /// 消费并清空当前累计移动输入。
+        /// 消费当前物理步命令。连续移动保留到下一物理步，跳跃只交付一次。
         /// </summary>
-        public Vector3 ConsumingMovementInput()
+        public CharacterMovementCommand ConsumeMovementCommand()
         {
-            Vector3 movementInput = Vector3.ClampMagnitude(pendingMovementInput, 1f);
-            pendingMovementInput = Vector3.zero;
+            bool jumpRequested = pendingJump;
+            pendingJump = false;
+            return new CharacterMovementCommand(movementInput, jumpRequested);
+        }
+
+        /// <summary>
+        /// 查看当前持续移动意图，不会消费它。
+        /// </summary>
+        public Vector3 PeekingMovementInput()
+        {
             return movementInput;
         }
 
         /// <summary>
-        /// 查看当前累计移动输入，但不消费它。
+        /// 清空控制意图，供换控或销毁时消除残留命令。
         /// </summary>
-        public Vector3 PeekingMovementInput()
+        public void ClearingControlIntent()
         {
-            return Vector3.ClampMagnitude(pendingMovementInput, 1f);
+            movementInput = Vector3.zero;
+            pendingJump = false;
         }
 
         public void AddingForce(Vector3 force)
@@ -119,14 +124,7 @@ namespace CGame
 
         public void AddingJumpInput()
         {
-            pendingJump = true;
-        }
-
-        public bool ConsumingJumpInput()
-        {
-            bool jump = pendingJump;
-            pendingJump = false;
-            return jump;
+            SubmitControlIntent(new CharacterControlIntent(movementInput, true));
         }
 
         /// <summary>
@@ -203,7 +201,7 @@ namespace CGame
             components.Clear();
             controller = null;
             Host = null;
-            pendingMovementInput = Vector3.zero;
+            movementInput = Vector3.zero;
             pendingForce = Vector3.zero;
             pendingImpulse = Vector3.zero;
             pendingJump = false;

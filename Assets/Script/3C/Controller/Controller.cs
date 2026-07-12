@@ -4,10 +4,10 @@ namespace CGame
 {
     public class Controller : IController
     {
-        private Pawn _controlledPawn;
-        private Vector3 _rotationInput;
+        private Pawn controlledPawn;
+        private Vector3 rotationInput;
 
-        public Pawn ControlledPawn => _controlledPawn;
+        public Pawn ControlledPawn => controlledPawn;
         public Quaternion ControlRotation { get; private set; } = Quaternion.identity;
 
         /// <summary>
@@ -24,14 +24,14 @@ namespace CGame
         /// </summary>
         public virtual void PossessingPawn(Pawn pawn)
         {
-            if (_controlledPawn == pawn)
+            if (controlledPawn == pawn)
             {
                 return;
             }
 
             UnpossessingPawn();
-            _controlledPawn = pawn;
-            _controlledPawn?.SettingController(this);
+            controlledPawn = pawn;
+            controlledPawn?.SettingController(this);
         }
 
         /// <summary>
@@ -39,14 +39,15 @@ namespace CGame
         /// </summary>
         public virtual void UnpossessingPawn()
         {
-            if (_controlledPawn == null)
+            if (controlledPawn == null)
             {
                 return;
             }
 
-            Pawn oldPawn = _controlledPawn;
-            _controlledPawn = null;
+            Pawn oldPawn = controlledPawn;
+            controlledPawn = null;
             oldPawn.ClearingController(this);
+            oldPawn.ClearingControlIntent();
         }
 
         /// <summary>
@@ -62,7 +63,7 @@ namespace CGame
         /// </summary>
         public void AddingPitchInput(float value)
         {
-            _rotationInput.x += value;
+            rotationInput.x += value;
         }
 
         /// <summary>
@@ -70,7 +71,7 @@ namespace CGame
         /// </summary>
         public void AddingYawInput(float value)
         {
-            _rotationInput.y += value;
+            rotationInput.y += value;
         }
 
         /// <summary>
@@ -78,7 +79,7 @@ namespace CGame
         /// </summary>
         public void AddingRollInput(float value)
         {
-            _rotationInput.z += value;
+            rotationInput.z += value;
         }
 
         /// <summary>
@@ -86,13 +87,13 @@ namespace CGame
         /// </summary>
         protected virtual void UpdatingControlRotation()
         {
-            if (_rotationInput == Vector3.zero)
+            if (rotationInput == Vector3.zero)
             {
                 return;
             }
 
-            ControlRotation = Quaternion.Euler(_rotationInput) * ControlRotation;
-            _rotationInput = Vector3.zero;
+            ControlRotation = Quaternion.Euler(rotationInput) * ControlRotation;
+            rotationInput = Vector3.zero;
         }
 
         /// <summary>
@@ -100,7 +101,7 @@ namespace CGame
         /// </summary>
         protected virtual void ApplyingControlRotationToPawn()
         {
-            _controlledPawn?.ApplyingControlRotation(ControlRotation);
+            controlledPawn?.ApplyingControlRotation(ControlRotation);
         }
     }
 }

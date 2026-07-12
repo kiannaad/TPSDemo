@@ -261,7 +261,7 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void PlayerMovementInput_ReachesMovementComponentVelocity()
+        public void PlayerMovementIntent_PersistsAcrossMultiplePhysicsSteps()
         {
             InputHandle playerHandle = inputManager.GetHandle(InputType.Player);
             Press(keyboard.wKey);
@@ -290,10 +290,32 @@ namespace CGame.Tests
             Assert.AreEqual(0f, velocity.y, 0.0001f);
             Assert.AreEqual(expectedAxisVelocity, velocity.z, 0.0001f);
 
-            object[] consumedArguments = { velocity, 0.1f };
-            movementType.GetMethod("UpdateVelocity").Invoke(movement, consumedArguments);
-            Vector3 brakingVelocity = (Vector3)consumedArguments[0];
-            Assert.Less(brakingVelocity.magnitude, velocity.magnitude);
+            object[] continuedArguments = { velocity, 0.1f };
+            movementType.GetMethod("UpdateVelocity").Invoke(movement, continuedArguments);
+            Vector3 continuedVelocity = (Vector3)continuedArguments[0];
+            Assert.Greater(continuedVelocity.magnitude, velocity.magnitude);
+        }
+
+        [Test]
+        public void CharacterControlIntent_ConsumesJumpOnceAndKeepsMovement()
+        {
+            Type pawnType = RequireRuntimeType("CGame.Pawn");
+            Type intentType = RequireRuntimeType("CGame.CharacterControlIntent");
+            object pawn = Activator.CreateInstance(pawnType);
+            object intent = Activator.CreateInstance(
+                intentType,
+                new object[] { new Vector3(0.3f, 0f, 0.4f), true });
+
+            pawnType.GetMethod("SubmitControlIntent").Invoke(pawn, new[] { intent });
+
+            object firstCommand = pawnType.GetMethod("ConsumeMovementCommand").Invoke(pawn, null);
+            object secondCommand = pawnType.GetMethod("ConsumeMovementCommand").Invoke(pawn, null);
+            Type commandType = firstCommand.GetType();
+
+            Assert.AreEqual(new Vector3(0.3f, 0f, 0.4f), commandType.GetProperty("MovementInput").GetValue(firstCommand));
+            Assert.IsTrue((bool)commandType.GetProperty("JumpRequested").GetValue(firstCommand));
+            Assert.AreEqual(new Vector3(0.3f, 0f, 0.4f), commandType.GetProperty("MovementInput").GetValue(secondCommand));
+            Assert.IsFalse((bool)commandType.GetProperty("JumpRequested").GetValue(secondCommand));
         }
 
         /// <summary>

@@ -53,6 +53,16 @@ namespace CGame.Tests
         }
 
         [UnityTest]
+        public IEnumerator CharacterTestStep_Exit_ReleasesRuntimeCharacter()
+        {
+            characterTestStep.GetType().GetMethod("Exit").Invoke(characterTestStep, null);
+            characterTestStep = null;
+            yield return null;
+
+            Assert.IsNull(GameObject.Find("RuntimeCharacter"));
+        }
+
+        [UnityTest]
         public IEnumerator HoldingForwardInput_MovesRuntimeCharacter()
         {
             GameObject character = GameObject.Find("RuntimeCharacter");

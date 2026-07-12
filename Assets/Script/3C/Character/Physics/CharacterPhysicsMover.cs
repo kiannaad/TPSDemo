@@ -154,14 +154,18 @@ namespace CGame
             Rigidbody.interpolation = RigidbodyInterpolation.None;
         }
 
+        private IPhysicsRegistration physicsRegistration;
+
         private void OnEnable()
         {
-            PhysicsManager.RegisterCharacterPhysicsMover(this);
+            physicsRegistration = PhysicsManager.CurrentWorld?.Register(this)
+                ?? throw new InvalidOperationException("Character physics world is not initialized.");
         }
 
         private void OnDisable()
         {
-            PhysicsManager.UnregisterCharacterPhysicsMover(this);
+            physicsRegistration?.Dispose();
+            physicsRegistration = null;
         }
 
         private void Awake()

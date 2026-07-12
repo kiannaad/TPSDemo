@@ -677,16 +677,19 @@ namespace CGame
         public const float MinSimulationTimeStep = 0.0001f;
 #pragma warning restore 0414
 
+        private IPhysicsRegistration physicsRegistration;
+
         private void OnEnable()
         {
-            // 确保全局 KCC 系统存在，随后把当前 Motor 加入模拟列表。
-            PhysicsManager.RegisterCharacterMotor(this);
+            physicsRegistration = PhysicsManager.CurrentWorld?.Register(this)
+                ?? throw new InvalidOperationException("Character physics world is not initialized.");
         }
 
         private void OnDisable()
         {
             // 当前 Motor 禁用后必须注销，否则系统会继续模拟失效对象。
-            PhysicsManager.UnregisterCharacterMotor(this);
+            physicsRegistration?.Dispose();
+            physicsRegistration = null;
         }
 
         private void Reset()

@@ -74,7 +74,8 @@ namespace CGame
             Vector3 up = Vector3.up;
             Vector3 horizontalVelocity = Vector3.ProjectOnPlane(currentVelocity, up);
             Vector3 verticalVelocity = Vector3.Project(currentVelocity, up);
-            Vector3 movementInput = owner.ConsumingMovementInput();
+            CharacterMovementCommand command = owner.ConsumeMovementCommand();
+            Vector3 movementInput = command.MovementInput;
             if (movementInput.sqrMagnitude > 0f)
             {
                 horizontalVelocity *= Mathf.Clamp01(1f - GroundFriction * deltaTime);
@@ -88,7 +89,7 @@ namespace CGame
             }
 
             bool isGrounded = motor == null || motor.GroundingStatus.IsStableOnGround;
-            bool jumpRequested = owner.ConsumingJumpInput();
+            bool jumpRequested = command.JumpRequested;
             if (jumpRequested && isGrounded && motor != null)
             {
                 verticalVelocity = up * JumpSpeed;
