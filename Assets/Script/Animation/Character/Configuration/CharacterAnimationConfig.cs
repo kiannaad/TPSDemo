@@ -5,7 +5,6 @@ namespace CGame.Animation
     [CreateAssetMenu(menuName = "CGame/Animation/Character Animation Config", fileName = "CharacterAnimationConfig")]
     public sealed class CharacterAnimationConfig : ScriptableObject
     {
-        [SerializeField] private GameObject characterPrefab;
         [SerializeField] private AnimationClipAsset idle;
         [SerializeField] private AnimationClipAsset walk;
         [SerializeField] private AnimationClipAsset run;
@@ -14,7 +13,6 @@ namespace CGame.Animation
         [SerializeField] private AnimationClipAsset inAir;
         [SerializeField] private AnimationClipAsset land;
 
-        public GameObject CharacterPrefab => characterPrefab;
         public AnimationClipAsset Idle => idle;
         public AnimationClipAsset Walk => walk;
         public AnimationClipAsset Run => run;
@@ -23,8 +21,7 @@ namespace CGame.Animation
         public AnimationClipAsset InAir => inAir;
         public AnimationClipAsset Land => land;
 
-        public bool IsValid => characterPrefab != null
-            && IsValidAsset(idle)
+        public bool IsValid => IsValidAsset(idle)
             && IsValidAsset(walk)
             && IsValidAsset(run)
             && IsValidAsset(stop)

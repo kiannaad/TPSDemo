@@ -23,17 +23,18 @@ namespace CGame
             CreatingLight(runtimeRoot.transform);
             CreatingGround(runtimeRoot.transform);
 
-            CharacterAnimationConfig animationConfig = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
-            if (animationConfig == null || !animationConfig.IsValid)
+            CharacterDefinition definition = Resources.Load<CharacterDefinition>("CharacterDefinition");
+            if (definition == null || !definition.IsValid)
             {
-                throw new System.InvalidOperationException("CharacterAnimationConfig is missing or invalid.");
+                throw new System.InvalidOperationException("CharacterDefinition is missing or invalid.");
             }
 
             InputHandle playerInput = inputManager.GetHandle(InputType.Player);
             var spawner = new CharacterRuntimeSpawner(pawnManager, controllerManager);
             runtimeCharacter = spawner.SpawnPlayer(new PlayerCharacterSpawnRequest(
                 runtimeRoot.transform,
-                animationConfig,
+                definition.VisualPrefab,
+                definition.AnimationConfig,
                 playerInput,
                 Vector3.zero,
                 Quaternion.identity,

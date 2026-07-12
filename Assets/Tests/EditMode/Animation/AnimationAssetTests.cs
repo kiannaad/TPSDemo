@@ -525,15 +525,15 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void HumanoidSampleClipAsset_IsEditableAndPlayable()
+        public void ProjectIdleClipAsset_IsEditableAndPlayable()
         {
-            const string sampleAssetPath = "Assets/Samples/Animancer/8.0.2/Animancer Samples/Art/Humanoid Animations/Humanoid-IdleClipAsset.asset";
+            const string sampleAssetPath = "Assets/Art/Animation/LocomotionAsset/InPlace/A_INP_IdleClipAsset.asset";
             AnimationClipAsset asset = AssetDatabase.LoadAssetAtPath<AnimationClipAsset>(sampleAssetPath);
             Assert.IsNotNull(asset);
             Assert.IsTrue(asset.IsValid);
             Assert.IsTrue(asset.CanEditNotifies);
 
-            GameObject gameObject = new GameObject("HumanoidSampleClipAssetPlaybackTest");
+            GameObject gameObject = new GameObject("ProjectIdleClipAssetPlaybackTest");
             try
             {
                 gameObject.AddComponent<Animator>();
@@ -551,9 +551,9 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void QuickPlaySampleScript_PlaysAnimationClipAssetOnEnable()
+        public void QuickPlaySampleScript_PlaysProjectIdleClipAssetOnEnable()
         {
-            const string sampleAssetPath = "Assets/Samples/Animancer/8.0.2/Animancer Samples/Art/Humanoid Animations/Humanoid-IdleClipAsset.asset";
+            const string sampleAssetPath = "Assets/Art/Animation/LocomotionAsset/InPlace/A_INP_IdleClipAsset.asset";
             Type sampleType = AppDomain.CurrentDomain.GetAssemblies()
                 .Select(assembly => assembly.GetType("Animancer.Samples.Basics.PlayAnimationOnEnable"))
                 .FirstOrDefault(type => type != null);

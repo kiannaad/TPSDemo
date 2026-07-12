@@ -13,7 +13,7 @@ namespace CGame.Tests
             CharacterAnimationConfig config = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
             Assert.IsNotNull(config);
             Assert.IsTrue(config.IsValid);
-            GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(config.CharacterPrefab);
+            GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(LoadVisualPrefab());
             CharacterAnimInstance instance = null;
             try
             {
@@ -49,8 +49,8 @@ namespace CGame.Tests
         public void CharacterGraph_DisposeAndRecreateLeavesFreshGraphState()
         {
             CharacterAnimationConfig config = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
-            GameObject firstVisual = (GameObject)PrefabUtility.InstantiatePrefab(config.CharacterPrefab);
-            GameObject secondVisual = (GameObject)PrefabUtility.InstantiatePrefab(config.CharacterPrefab);
+            GameObject firstVisual = (GameObject)PrefabUtility.InstantiatePrefab(LoadVisualPrefab());
+            GameObject secondVisual = (GameObject)PrefabUtility.InstantiatePrefab(LoadVisualPrefab());
             CharacterAnimInstance first = null;
             CharacterAnimInstance second = null;
             try
@@ -82,7 +82,7 @@ namespace CGame.Tests
         public void CharacterConfig_ReferencesOnlyExpectedArtAssets()
         {
             CharacterAnimationConfig config = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
-            Assert.IsTrue(AssetDatabase.GetAssetPath(config.CharacterPrefab).StartsWith("Assets/Art/"));
+            Assert.IsTrue(AssetDatabase.GetAssetPath(LoadVisualPrefab()).StartsWith("Assets/Art/"));
             AnimationClipAsset[] assets =
             {
                 config.Idle, config.Walk, config.Run, config.Stop,
@@ -112,6 +112,14 @@ namespace CGame.Tests
                 jumping ? velocity.y / 9.81f : 0f);
             instance.UpdatePhysicalProperties(frame);
             instance.UpdateAnimation(0.016f);
+        }
+
+        private static GameObject LoadVisualPrefab()
+        {
+            const string visualPrefabPath = "Assets/Art/Animation/FemaleLocomotionSet/Prefabs/Robot Kyle.prefab";
+            GameObject visualPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(visualPrefabPath);
+            Assert.IsNotNull(visualPrefab);
+            return visualPrefab;
         }
     }
 }

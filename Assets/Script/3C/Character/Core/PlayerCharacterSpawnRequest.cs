@@ -10,6 +10,7 @@ namespace CGame
     {
         public PlayerCharacterSpawnRequest(
             Transform parent,
+            GameObject visualPrefab,
             CharacterAnimationConfig animationConfig,
             InputHandle input,
             Vector3 position,
@@ -17,6 +18,7 @@ namespace CGame
             string name)
         {
             Parent = parent;
+            VisualPrefab = visualPrefab;
             AnimationConfig = animationConfig;
             Input = input;
             Position = position;
@@ -25,6 +27,7 @@ namespace CGame
         }
 
         public Transform Parent { get; }
+        public GameObject VisualPrefab { get; }
         public CharacterAnimationConfig AnimationConfig { get; }
         public InputHandle Input { get; }
         public Vector3 Position { get; }
