@@ -44,10 +44,7 @@ namespace CGame.Tests
         [UnityTest]
         public IEnumerator CharacterReady_RegistersPhysicsAndMovesFromNextFullFrame()
         {
-            Type gameManagerType = RequireRuntimeType("CGame.GameManager");
-            _ = GetStaticInstance(gameManagerType);
-            object spawnManager = gameManagerType.GetMethod("CreateManager", BindingFlags.Public | BindingFlags.Static)
-                ?.Invoke(null, new object[] { RequireRuntimeType("CGame.CharacterSpawnManager") });
+            object spawnManager = CharacterSpawnTestConfiguration.CreateManagerWithInMemoryDefinition();
             Assert.NotNull(spawnManager);
 
             object operation = Invoke(spawnManager, "BeginSpawn", CreateRequest("playmode-ready", "SpawnPipelineCharacter", Vector3.zero));
@@ -83,10 +80,7 @@ namespace CGame.Tests
         [UnityTest]
         public IEnumerator Despawn_ReleasesOneRuntimeWithoutInvalidatingAnother()
         {
-            Type gameManagerType = RequireRuntimeType("CGame.GameManager");
-            _ = GetStaticInstance(gameManagerType);
-            object spawnManager = gameManagerType.GetMethod("CreateManager", BindingFlags.Public | BindingFlags.Static)
-                ?.Invoke(null, new object[] { RequireRuntimeType("CGame.CharacterSpawnManager") });
+            object spawnManager = CharacterSpawnTestConfiguration.CreateManagerWithInMemoryDefinition();
             object firstOperation = Invoke(spawnManager, "BeginSpawn", CreateRequest("first-runtime", "FirstRuntimeCharacter", Vector3.zero));
             object secondOperation = Invoke(spawnManager, "BeginSpawn", CreateRequest("second-runtime", "SecondRuntimeCharacter", new Vector3(2f, 0f, 0f)));
             for (int i = 0; i < 5; i++)
@@ -118,10 +112,7 @@ namespace CGame.Tests
         [UnityTest]
         public IEnumerator GameManagerShutdown_ReleasesRuntimeBeforePhysicsDependency()
         {
-            Type gameManagerType = RequireRuntimeType("CGame.GameManager");
-            _ = GetStaticInstance(gameManagerType);
-            object spawnManager = gameManagerType.GetMethod("CreateManager", BindingFlags.Public | BindingFlags.Static)
-                ?.Invoke(null, new object[] { RequireRuntimeType("CGame.CharacterSpawnManager") });
+            object spawnManager = CharacterSpawnTestConfiguration.CreateManagerWithInMemoryDefinition();
             object operation = Invoke(spawnManager, "BeginSpawn", CreateRequest("shutdown-runtime", "ShutdownRuntimeCharacter", Vector3.zero));
             for (int i = 0; i < 5; i++)
             {
@@ -222,6 +213,49 @@ namespace CGame.Tests
             {
                 UnityEngine.Object.DestroyImmediate(target);
             }
+        }
+    }
+
+    internal static class CharacterSpawnTestConfiguration
+    {
+        public static object CreateManagerWithInMemoryDefinition()
+        {
+            Type gameManagerType = RequireRuntimeType("CGame.GameManager");
+            _ = GetStaticInstance(gameManagerType);
+            object spawnManager = gameManagerType.GetMethod("CreateManager", BindingFlags.Public | BindingFlags.Static)
+                ?.Invoke(null, new object[] { RequireRuntimeType("CGame.CharacterSpawnManager") });
+            if (spawnManager == null)
+            {
+                throw new InvalidOperationException("CharacterSpawnManager could not be created.");
+            }
+
+            CharacterDefinition definition = Resources.Load<CharacterDefinition>("CharacterDefinition");
+            spawnManager.GetType().GetField("definitionProvider", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.SetValue(spawnManager, new InMemoryCharacterDefinitionProvider(new[] { definition }));
+            return spawnManager;
+        }
+
+        private static object GetStaticInstance(Type type)
+        {
+            while (type != null)
+            {
+                PropertyInfo property = type.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+                if (property != null)
+                {
+                    return property.GetValue(null);
+                }
+
+                type = type.BaseType;
+            }
+
+            return null;
+        }
+
+        private static Type RequireRuntimeType(string fullName)
+        {
+            Type type = Type.GetType($"{fullName}, Assembly-CSharp")
+                ?? Type.GetType($"{fullName}, CGame.Input");
+            return type ?? throw new InvalidOperationException($"Runtime type not found: {fullName}");
         }
     }
 }

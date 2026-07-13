@@ -17,6 +17,8 @@ public class ResourceManager : Singleton<ResourceManager>
     /// </summary>
     public async Task InitializeAsync(string packageName = "DefaultPackage")
     {
+        IsReady = false;
+
         // 1. 初始化系统
         YooAssets.Initialize();
 
@@ -27,8 +29,14 @@ public class ResourceManager : Singleton<ResourceManager>
         // 3. 根据环境确定运行模式
         InitializeParameters parameters = null;
 #if UNITY_EDITOR
+        PackageInvokeBuildResult buildResult = EditorSimulateModeHelper.SimulateBuild(packageName);
+        if (buildResult == null || string.IsNullOrWhiteSpace(buildResult.PackageRootDirectory))
+        {
+            throw new InvalidOperationException($"Failed to build the YooAsset editor simulation manifest for {packageName}.");
+        }
+
         var editorParam = new EditorSimulateModeParameters();
-        editorParam.EditorFileSystemParameters = FileSystemParameters.CreateDefaultEditorFileSystemParameters(packageName);
+        editorParam.EditorFileSystemParameters = FileSystemParameters.CreateDefaultEditorFileSystemParameters(buildResult.PackageRootDirectory);
         parameters = editorParam;
 #else
         // 默认离线模式，联机模式可根据需求在此扩展逻辑
@@ -41,15 +49,30 @@ public class ResourceManager : Singleton<ResourceManager>
         var operation = _defaultPackage.InitializeAsync(parameters);
         await operation.Task;
 
-        if (operation.Status == EOperationStatus.Succeed)
-        {
-            IsReady = true;
-            Debug.Log($"<color=green>ResourceManager: {packageName} initialized successfully!</color>");
-        }
-        else
+        if (operation.Status != EOperationStatus.Succeed)
         {
             Debug.LogError($"ResourceManager: {packageName} initialization failed: {operation.Error}");
+            return;
         }
+
+        RequestPackageVersionOperation versionOperation = _defaultPackage.RequestPackageVersionAsync();
+        await versionOperation.Task;
+        if (versionOperation.Status != EOperationStatus.Succeed)
+        {
+            Debug.LogError($"ResourceManager: {packageName} version request failed: {versionOperation.Error}");
+            return;
+        }
+
+        UpdatePackageManifestOperation manifestOperation = _defaultPackage.UpdatePackageManifestAsync(versionOperation.PackageVersion);
+        await manifestOperation.Task;
+        if (manifestOperation.Status != EOperationStatus.Succeed)
+        {
+            Debug.LogError($"ResourceManager: {packageName} manifest update failed: {manifestOperation.Error}");
+            return;
+        }
+
+        IsReady = true;
+        Debug.Log($"<color=green>ResourceManager: {packageName} initialized successfully!</color>");
     }
 
     /// <summary>

@@ -103,8 +103,7 @@ namespace CGame
             pawnManager = GameManager.GetManager<PawnManager>();
             controllerManager = GameManager.GetManager<ControllerManager>();
             GameManager.GetManager<PhysicsManager>();
-            CharacterDefinition definition = Resources.Load<CharacterDefinition>("CharacterDefinition");
-            definitionProvider = new InMemoryCharacterDefinitionProvider(new[] { definition });
+            definitionProvider = new YooAssetCharacterDefinitionProvider(global::AssetManager.Instance);
             assembler = new CharacterAssembler();
             localPlayerBinder = new LocalPlayerControllerBinder(inputManager, controllerManager);
             runtimeRoot = new GameObject("[CharacterRuntimeRoot]").transform;
@@ -155,10 +154,7 @@ namespace CGame
             definitionLeases.Clear();
             foreach (ICharacterDefinitionResolveOperation resolveOperation in resolveOperations.Values)
             {
-                if (resolveOperation.IsCompleted)
-                {
-                    resolveOperation.Result.Lease?.Dispose();
-                }
+                resolveOperation.Dispose();
             }
 
             resolveOperations.Clear();
@@ -214,7 +210,7 @@ namespace CGame
                         CharacterDefinitionResolveResult result = resolveOperation.Result;
                         if (!result.IsSuccess)
                         {
-                            result.Lease?.Dispose();
+                            resolveOperation.Dispose();
                             Fail(operation, MapResolveError(result.Error));
                             break;
                         }
@@ -298,10 +294,7 @@ namespace CGame
             if (resolveOperations.TryGetValue(operation, out ICharacterDefinitionResolveOperation resolveOperation))
             {
                 resolveOperations.Remove(operation);
-                if (resolveOperation.IsCompleted)
-                {
-                    resolveOperation.Result.Lease?.Dispose();
-                }
+                resolveOperation.Dispose();
             }
 
             CleanupPendingOperation(operation);
@@ -321,7 +314,7 @@ namespace CGame
                 }
 
                 resolveOperations.Remove(operation);
-                resolveOperation.Result.Lease?.Dispose();
+                resolveOperation.Dispose();
             }
 
             CleanupPendingOperation(operation);

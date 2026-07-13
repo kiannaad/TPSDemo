@@ -267,7 +267,14 @@ namespace CGame.Tests
             Type gameManagerType = RequireRuntimeType("CGame.GameManager");
             object manager = gameManagerType.GetMethod("CreateManager", BindingFlags.Public | BindingFlags.Static)
                 ?.Invoke(null, new object[] { RequireRuntimeType("CGame.CharacterSpawnManager") });
-            return manager ?? throw new InvalidOperationException("CharacterSpawnManager could not be created.");
+            if (manager == null)
+            {
+                throw new InvalidOperationException("CharacterSpawnManager could not be created.");
+            }
+
+            CharacterDefinition definition = Resources.Load<CharacterDefinition>("CharacterDefinition");
+            SetField(manager, "definitionProvider", new InMemoryCharacterDefinitionProvider(new[] { definition }));
+            return manager;
         }
 
         private void AssertStageFailure(string stage)

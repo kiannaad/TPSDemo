@@ -49,6 +49,7 @@ namespace CGame.Tests
 
             Type stepType = Type.GetType("CGame.CharacterTestStep, Assembly-CSharp");
             Assert.IsNotNull(stepType);
+            CharacterSpawnTestConfiguration.CreateManagerWithInMemoryDefinition();
             characterTestStep = Activator.CreateInstance(stepType);
             MethodInfo enterMethod = stepType.GetMethod("Enter");
             Assert.IsNotNull(enterMethod);
@@ -232,6 +233,7 @@ namespace CGame.Tests
         {
             Type stepType = Type.GetType("CGame.CharacterTestStep, Assembly-CSharp");
             Assert.NotNull(stepType);
+            CharacterSpawnTestConfiguration.CreateManagerWithInMemoryDefinition();
             characterTestStep = Activator.CreateInstance(stepType);
             stepType.GetMethod("Enter").Invoke(characterTestStep, null);
             for (int i = 0; i < 120 && GameObject.Find("RuntimeCharacter") == null; i++)
@@ -268,6 +270,12 @@ namespace CGame.Tests
         [SetUp]
         public void Setup()
         {
+            FieldInfo settingField = typeof(YooAssetSettingsData).GetField("_setting", BindingFlags.Static | BindingFlags.NonPublic);
+            if (settingField?.GetValue(null) == null)
+            {
+                LogAssert.Expect(LogType.Log, new Regex("YooAsset use (default|user) settings\\."));
+                YooAssetSettingsData.GetDefaultYooFolderName();
+            }
         }
 
         [TearDown]

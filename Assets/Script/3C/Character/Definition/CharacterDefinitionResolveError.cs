@@ -5,6 +5,7 @@ namespace CGame
         None,
         InvalidDefinitionId,
         DefinitionNotFound,
+        AssetLoadFailed,
         DefinitionIdMismatch,
         MissingVisualPrefab,
         InvalidAnimationConfig,

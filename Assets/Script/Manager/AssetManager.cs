@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 /// <summary>
 /// 业务接口代理单例（对外统一入口，极简职责）
 /// </summary>
-public class AssetManager : Singleton<AssetManager>
+public class AssetManager : Singleton<AssetManager>, CGame.ICharacterDefinitionAssetLoader
 {
     // 快捷访问默认包裹
     private ResourcePackage Package => ResourceManager.Instance.GetPackage();
@@ -16,6 +16,16 @@ public class AssetManager : Singleton<AssetManager>
     public AssetHandle LoadAsset<T>(string location) where T : Object
     {
         return Package.LoadAssetAsync<T>(location);
+    }
+
+    public CGame.ICharacterDefinitionAssetLoadOperation BeginLoad(string location)
+    {
+        if (string.IsNullOrWhiteSpace(location))
+        {
+            throw new System.ArgumentException("A valid asset location is required.", nameof(location));
+        }
+
+        return new YooAssetCharacterDefinitionLoadOperation(LoadAsset<CGame.CharacterDefinition>(location));
     }
 
     /// <summary>

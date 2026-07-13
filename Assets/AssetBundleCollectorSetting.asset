@@ -15,4 +15,26 @@ MonoBehaviour:
   ShowPackageView: 1
   ShowEditorAlias: 1
   UniqueBundleName: 1
-  Packages: []
+  Packages:
+  - PackageName: DefaultPackage
+    PackageDesc: Runtime character definitions
+    EnableAddressable: 1
+    SupportExtensionless: 1
+    LocationToLower: 0
+    IncludeAssetGUID: 0
+    AutoCollectShaders: 1
+    IgnoreRuleName: NormalIgnoreRule
+    Groups:
+    - GroupName: character-definition
+      GroupDesc: Runtime character definition assets
+      AssetTags:
+      ActiveRuleName: EnableGroup
+      Collectors:
+      - CollectPath: Assets/Resources/CharacterDefinition.asset
+        CollectorGUID: a5ee80a94ea73824298726dec63166aa
+        CollectorType: 0
+        AddressRuleName: AddressByFileName
+        PackRuleName: PackSeparately
+        FilterRuleName: CollectAll
+        AssetTags:
+        UserData:
