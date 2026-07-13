@@ -1,0 +1,16 @@
+{
+    "name": "CGame.Animation",
+    "rootNamespace": "CGame.Animation",
+    "references": [
+        "Kybernetik.Animancer"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

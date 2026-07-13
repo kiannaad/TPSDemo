@@ -1,4 +1,5 @@
 ﻿using System.Reflection;
+using System;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -128,6 +129,72 @@ namespace CGame.Tests
         }
 
         /// <summary>
+        /// 验证禁用 Player 输入方案时，会清理已注册的状态回调，重新启用后旧回调不会残留触发。
+        /// </summary>
+        [Test]
+        public void DisablePlayerMap_RemovesRegisteredStateCallbacks()
+        {
+            InputHandle playerHandle = inputManager.GetHandle(InputType.Player);
+            int jumpCallbackCount = 0;
+
+            void OnJump(InputAction.CallbackContext context)
+            {
+                jumpCallbackCount++;
+            }
+
+            playerHandle.AddStateCallback(PlayerInputStateKey.JumpPressed, InputCallbackPhase.Performed, OnJump);
+            playerHandle.Disable();
+            playerHandle.Enable();
+
+            Press(keyboard.spaceKey);
+            UpdateInputManager();
+
+            Assert.AreEqual(0, jumpCallbackCount);
+        }
+
+        /// <summary>
+        /// 验证禁用 Player 输入方案时，会清理完整 Player 回调接口，重新启用后旧回调不会残留触发。
+        /// </summary>
+        [Test]
+        public void DisablePlayerMap_RemovesRegisteredPlayerCallbacks()
+        {
+            InputHandle playerHandle = inputManager.GetHandle(InputType.Player);
+            PlayerActionsCallbackCounter callbacks = new PlayerActionsCallbackCounter();
+
+            playerHandle.AddCallbacks<PlayerInput.IPlayerActions>(callbacks);
+            playerHandle.Disable();
+            playerHandle.Enable();
+
+            Press(keyboard.spaceKey);
+            UpdateInputManager();
+
+            Assert.AreEqual(0, callbacks.JumpCallbackCount);
+        }
+
+        /// <summary>
+        /// 验证禁用 Player 输入方案时，会立即清空旧的 PlayerInputState。
+        /// </summary>
+        [Test]
+        public void DisablePlayerMap_ClearsPlayerInputState()
+        {
+            InputHandle playerHandle = inputManager.GetHandle(InputType.Player);
+
+            Press(keyboard.wKey);
+            Press(keyboard.leftShiftKey);
+            UpdateInputManager();
+
+            PlayerInputState activeState = playerHandle.GetState<PlayerInputState>();
+            AssertMove(activeState.MoveInput, 0f, 1f);
+            Assert.IsTrue(activeState.SprintHeld);
+
+            playerHandle.Disable();
+
+            PlayerInputState disabledState = playerHandle.GetState<PlayerInputState>();
+            AssertMove(disabledState.MoveInput, 0f, 0f);
+            Assert.IsFalse(disabledState.SprintHeld);
+        }
+
+        /// <summary>
         /// 验证从 Player 切换到 Vehicle 后，Player 输入方案失效，Vehicle 输入方案生效。
         /// </summary>
         [Test]
@@ -191,6 +258,64 @@ namespace CGame.Tests
             Assert.IsTrue(playerHandle.GetState<PlayerInputState>().AimHeld);
             Release(mouse.rightButton);
             UpdateInputManager();
+        }
+
+        [Test]
+        public void PlayerMovementIntent_PersistsAcrossMultiplePhysicsSteps()
+        {
+            InputHandle playerHandle = inputManager.GetHandle(InputType.Player);
+            Press(keyboard.wKey);
+            Press(keyboard.dKey);
+            UpdateInputManager();
+
+            Type pawnType = RequireRuntimeType("CGame.Pawn");
+            Type controllerType = RequireRuntimeType("CGame.PlayerController");
+            Type movementType = RequireRuntimeType("CGame.MovementComp");
+            object pawn = Activator.CreateInstance(pawnType);
+            object controller = Activator.CreateInstance(controllerType);
+            object movement = Activator.CreateInstance(movementType);
+
+            pawnType.GetMethod("RegisteringComponent").Invoke(pawn, new[] { movement });
+            controllerType.GetMethod("PossessingPawn").Invoke(controller, new[] { pawn });
+            Func<PlayerInputState> stateProvider = () => playerHandle.GetState<PlayerInputState>();
+            controllerType.GetMethod("SettingInputStateProvider").Invoke(controller, new object[] { stateProvider });
+            controllerType.GetMethod("UpdatingController").Invoke(controller, new object[] { 0.1f });
+
+            object[] velocityArguments = { Vector3.zero, 0.1f };
+            movementType.GetMethod("UpdateVelocity").Invoke(movement, velocityArguments);
+            Vector3 velocity = (Vector3)velocityArguments[0];
+
+            float expectedAxisVelocity = 20f * 0.1f / Mathf.Sqrt(2f);
+            Assert.AreEqual(expectedAxisVelocity, velocity.x, 0.0001f);
+            Assert.AreEqual(0f, velocity.y, 0.0001f);
+            Assert.AreEqual(expectedAxisVelocity, velocity.z, 0.0001f);
+
+            object[] continuedArguments = { velocity, 0.1f };
+            movementType.GetMethod("UpdateVelocity").Invoke(movement, continuedArguments);
+            Vector3 continuedVelocity = (Vector3)continuedArguments[0];
+            Assert.Greater(continuedVelocity.magnitude, velocity.magnitude);
+        }
+
+        [Test]
+        public void CharacterControlIntent_ConsumesJumpOnceAndKeepsMovement()
+        {
+            Type pawnType = RequireRuntimeType("CGame.Pawn");
+            Type intentType = RequireRuntimeType("CGame.CharacterControlIntent");
+            object pawn = Activator.CreateInstance(pawnType);
+            object intent = Activator.CreateInstance(
+                intentType,
+                new object[] { new Vector3(0.3f, 0f, 0.4f), true });
+
+            pawnType.GetMethod("SubmitControlIntent").Invoke(pawn, new[] { intent });
+
+            object firstCommand = pawnType.GetMethod("ConsumeMovementCommand").Invoke(pawn, null);
+            object secondCommand = pawnType.GetMethod("ConsumeMovementCommand").Invoke(pawn, null);
+            Type commandType = firstCommand.GetType();
+
+            Assert.AreEqual(new Vector3(0.3f, 0f, 0.4f), commandType.GetProperty("MovementInput").GetValue(firstCommand));
+            Assert.IsTrue((bool)commandType.GetProperty("JumpRequested").GetValue(firstCommand));
+            Assert.AreEqual(new Vector3(0.3f, 0f, 0.4f), commandType.GetProperty("MovementInput").GetValue(secondCommand));
+            Assert.IsFalse((bool)commandType.GetProperty("JumpRequested").GetValue(secondCommand));
         }
 
         /// <summary>
@@ -285,7 +410,9 @@ namespace CGame.Tests
         /// </summary>
         private void UpdateInputManager()
         {
-            MethodInfo method = typeof(CGame.InputManager).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo method = typeof(CGame.InputManager).GetMethod(
+                "Update",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             method.Invoke(inputManager, new object[] { 0.016f });
         }
 
@@ -299,7 +426,9 @@ namespace CGame.Tests
                 return;
             }
 
-            MethodInfo method = typeof(CGame.InputManager).GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo method = typeof(CGame.InputManager).GetMethod(
+                methodName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
             method.Invoke(inputManager, null);
         }
 
@@ -310,6 +439,61 @@ namespace CGame.Tests
         {
             Assert.AreEqual(expectedX, actual.x, 0.0001f);
             Assert.AreEqual(expectedY, actual.y, 0.0001f);
+        }
+
+        private static Type RequireRuntimeType(string typeName)
+        {
+            Type type = Type.GetType($"{typeName}, Assembly-CSharp");
+            Assert.IsNotNull(type, $"找不到运行时类型 {typeName}");
+            return type;
+        }
+
+        private sealed class PlayerActionsCallbackCounter : PlayerInput.IPlayerActions
+        {
+            public int JumpCallbackCount;
+
+            /// <summary>
+            /// 统计移动回调次数。
+            /// </summary>
+            public void OnMove(InputAction.CallbackContext context)
+            {
+            }
+
+            /// <summary>
+            /// 统计视角回调次数。
+            /// </summary>
+            public void OnLook(InputAction.CallbackContext context)
+            {
+            }
+
+            /// <summary>
+            /// 统计开火回调次数。
+            /// </summary>
+            public void OnFire(InputAction.CallbackContext context)
+            {
+            }
+
+            /// <summary>
+            /// 统计跳跃回调次数。
+            /// </summary>
+            public void OnJump(InputAction.CallbackContext context)
+            {
+                JumpCallbackCount++;
+            }
+
+            /// <summary>
+            /// 统计冲刺回调次数。
+            /// </summary>
+            public void OnSprint(InputAction.CallbackContext context)
+            {
+            }
+
+            /// <summary>
+            /// 统计瞄准回调次数。
+            /// </summary>
+            public void OnAim(InputAction.CallbackContext context)
+            {
+            }
         }
     }
 }

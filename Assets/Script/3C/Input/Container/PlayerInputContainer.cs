@@ -21,6 +21,7 @@ namespace CGame
             };
 
         private readonly PlayerInput input;
+        private readonly List<PlayerInput.IPlayerActions> _callbacks = new List<PlayerInput.IPlayerActions>();
 
         /// <summary>
         /// 创建 Player 输入容器。
@@ -35,12 +36,20 @@ namespace CGame
         /// <summary>
         /// 注册 Player 输入回调接口。
         /// </summary>
-        public void AddCallbacks(PlayerInput.IPlayerActions cb) => input.Player.AddCallbacks(cb);
+        public void AddCallbacks(PlayerInput.IPlayerActions cb)
+        {
+            input.Player.AddCallbacks(cb);
+            _callbacks.Add(cb);
+        }
 
         /// <summary>
         /// 移除 Player 输入回调接口。
         /// </summary>
-        public void RemoveCallbacks(PlayerInput.IPlayerActions cb) => input.Player.RemoveCallbacks(cb);
+        public void RemoveCallbacks(PlayerInput.IPlayerActions cb)
+        {
+            input.Player.RemoveCallbacks(cb);
+            _callbacks.Remove(cb);
+        }
 
         /// <summary>
         /// 根据 Player 输入状态语义查找对应的底层 Action。
@@ -75,6 +84,19 @@ namespace CGame
                 SprintHeld = input.Player.Sprint.IsPressed(),
                 AimHeld = input.Player.Aim.IsPressed(),
             };
+        }
+
+        /// <summary>
+        /// 清理 Player 输入方案注册的完整回调接口。
+        /// </summary>
+        protected override void ClearingContainerCallbacks()
+        {
+            for (int i = 0; i < _callbacks.Count; i++)
+            {
+                input.Player.RemoveCallbacks(_callbacks[i]);
+            }
+
+            _callbacks.Clear();
         }
     }
 }

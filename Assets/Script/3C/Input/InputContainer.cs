@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine.InputSystem;
 
 namespace CGame
 {
     public abstract class InputContainer
     {
+        private readonly List<StateCallbackRegistration> _stateCallbackRegistrations = new List<StateCallbackRegistration>();
+
         protected abstract InputActionMap ActionMap { get; }
 
         /// <summary>
@@ -13,9 +16,14 @@ namespace CGame
         public void Enable() => ActionMap.Enable();
 
         /// <summary>
-        /// 禁用当前输入方案。
+        /// 禁用当前输入方案，并清理回调注册和输入状态。
         /// </summary>
-        public void Disable() => ActionMap.Disable();
+        public void Disable()
+        {
+            ClearingCallbacks();
+            ActionMap.Disable();
+            ClearingState();
+        }
 
         /// <summary>
         /// 根据输入状态语义启用对应的底层 Action。
@@ -43,6 +51,60 @@ namespace CGame
             where TStateKey : Enum
         {
             InputAction inputAction = GetActionByState(stateKey);
+            BindingCallback(inputAction, phase, callback);
+            _stateCallbackRegistrations.Add(new StateCallbackRegistration(inputAction, phase, callback));
+        }
+
+        /// <summary>
+        /// 根据输入状态语义移除对应 Action 的阶段回调。
+        /// </summary>
+        public void RemoveStateCallback<TStateKey>(
+            TStateKey stateKey,
+            InputCallbackPhase phase,
+            Action<InputAction.CallbackContext> callback)
+            where TStateKey : Enum
+        {
+            InputAction inputAction = GetActionByState(stateKey);
+            UnbindingCallback(inputAction, phase, callback);
+            RemovingStateCallbackRegistration(inputAction, phase, callback);
+        }
+
+        /// <summary>
+        /// 根据状态语义查找对应的底层 Action。
+        /// </summary>
+        protected abstract InputAction GetActionByState<TStateKey>(TStateKey stateKey) where TStateKey : Enum;
+
+        /// <summary>
+        /// 根据 Action 名称查找底层 Action。
+        /// </summary>
+        protected InputAction GetAction(string actionName)
+        {
+            return ActionMap.FindAction(actionName, throwIfNotFound: true);
+        }
+
+        /// <summary>
+        /// 清理当前容器注册过的全部回调。
+        /// </summary>
+        private void ClearingCallbacks()
+        {
+            for (int i = 0; i < _stateCallbackRegistrations.Count; i++)
+            {
+                StateCallbackRegistration registration = _stateCallbackRegistrations[i];
+                UnbindingCallback(registration.InputAction, registration.Phase, registration.Callback);
+            }
+
+            _stateCallbackRegistrations.Clear();
+            ClearingContainerCallbacks();
+        }
+
+        /// <summary>
+        /// 注册指定阶段的输入回调。
+        /// </summary>
+        private void BindingCallback(
+            InputAction inputAction,
+            InputCallbackPhase phase,
+            Action<InputAction.CallbackContext> callback)
+        {
             switch (phase)
             {
                 case InputCallbackPhase.Started:
@@ -60,15 +122,13 @@ namespace CGame
         }
 
         /// <summary>
-        /// 根据输入状态语义移除对应 Action 的阶段回调。
+        /// 注销指定阶段的输入回调。
         /// </summary>
-        public void RemoveStateCallback<TStateKey>(
-            TStateKey stateKey,
+        private void UnbindingCallback(
+            InputAction inputAction,
             InputCallbackPhase phase,
             Action<InputAction.CallbackContext> callback)
-            where TStateKey : Enum
         {
-            InputAction inputAction = GetActionByState(stateKey);
             switch (phase)
             {
                 case InputCallbackPhase.Started:
@@ -86,22 +146,64 @@ namespace CGame
         }
 
         /// <summary>
-        /// 根据状态语义查找对应的底层 Action。
+        /// 移除已记录的输入回调注册。
         /// </summary>
-        protected abstract InputAction GetActionByState<TStateKey>(TStateKey stateKey) where TStateKey : Enum;
+        private void RemovingStateCallbackRegistration(
+            InputAction inputAction,
+            InputCallbackPhase phase,
+            Action<InputAction.CallbackContext> callback)
+        {
+            for (int i = _stateCallbackRegistrations.Count - 1; i >= 0; i--)
+            {
+                StateCallbackRegistration registration = _stateCallbackRegistrations[i];
+                if (registration.InputAction == inputAction &&
+                    registration.Phase == phase &&
+                    registration.Callback == callback)
+                {
+                    _stateCallbackRegistrations.RemoveAt(i);
+                    return;
+                }
+            }
+        }
 
         /// <summary>
-        /// 根据 Action 名称查找底层 Action。
+        /// 清理具体容器注册的完整回调接口。
         /// </summary>
-        protected InputAction GetAction(string actionName)
+        protected virtual void ClearingContainerCallbacks()
         {
-            return ActionMap.FindAction(actionName, throwIfNotFound: true);
+        }
+
+        /// <summary>
+        /// 清理当前输入状态。
+        /// </summary>
+        protected virtual void ClearingState()
+        {
         }
 
         /// <summary>
         /// 刷新输入状态快照。
         /// </summary>
         internal abstract void Tick();
+
+        private readonly struct StateCallbackRegistration
+        {
+            public readonly InputAction InputAction;
+            public readonly InputCallbackPhase Phase;
+            public readonly Action<InputAction.CallbackContext> Callback;
+
+            /// <summary>
+            /// 创建输入状态回调注册记录。
+            /// </summary>
+            public StateCallbackRegistration(
+                InputAction inputAction,
+                InputCallbackPhase phase,
+                Action<InputAction.CallbackContext> callback)
+            {
+                InputAction = inputAction;
+                Phase = phase;
+                Callback = callback;
+            }
+        }
     }
 
     /// <summary>
@@ -110,5 +212,13 @@ namespace CGame
     public abstract class InputContainer<TState> : InputContainer where TState : struct
     {
         public TState State { get; protected set; }
+
+        /// <summary>
+        /// 清理当前输入状态快照。
+        /// </summary>
+        protected override void ClearingState()
+        {
+            State = default;
+        }
     }
 }

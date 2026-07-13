@@ -18,6 +18,7 @@ namespace CGame
             };
 
         private readonly PlayerInput input;
+        private readonly List<PlayerInput.IVehicleActions> _callbacks = new List<PlayerInput.IVehicleActions>();
 
         /// <summary>
         /// 创建 Vehicle 输入容器。
@@ -32,12 +33,20 @@ namespace CGame
         /// <summary>
         /// 注册 Vehicle 输入回调接口。
         /// </summary>
-        public void AddCallbacks(PlayerInput.IVehicleActions cb) => input.Vehicle.AddCallbacks(cb);
+        public void AddCallbacks(PlayerInput.IVehicleActions cb)
+        {
+            input.Vehicle.AddCallbacks(cb);
+            _callbacks.Add(cb);
+        }
 
         /// <summary>
         /// 移除 Vehicle 输入回调接口。
         /// </summary>
-        public void RemoveCallbacks(PlayerInput.IVehicleActions cb) => input.Vehicle.RemoveCallbacks(cb);
+        public void RemoveCallbacks(PlayerInput.IVehicleActions cb)
+        {
+            input.Vehicle.RemoveCallbacks(cb);
+            _callbacks.Remove(cb);
+        }
 
         /// <summary>
         /// 根据 Vehicle 输入状态语义查找对应的底层 Action。
@@ -69,6 +78,19 @@ namespace CGame
                 BrakeHeld = input.Vehicle.Brake.IsPressed(),
                 ExitPressed = input.Vehicle.Exit.WasPressedThisFrame(),
             };
+        }
+
+        /// <summary>
+        /// 清理 Vehicle 输入方案注册的完整回调接口。
+        /// </summary>
+        protected override void ClearingContainerCallbacks()
+        {
+            for (int i = 0; i < _callbacks.Count; i++)
+            {
+                input.Vehicle.RemoveCallbacks(_callbacks[i]);
+            }
+
+            _callbacks.Clear();
         }
     }
 }

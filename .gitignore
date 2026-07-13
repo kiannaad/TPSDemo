@@ -4,6 +4,7 @@
 [Oo]bj/
 [Bb]uild/
 [Bb]uilds/
+[Bb]undles/
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 
@@ -53,6 +54,30 @@ sysinfo.txt
 .harness/state.json
 .harness/backups/
 
+# Plugins ExampleProgram
+/Assets/KinematicCharacterController/
+/Assets/KinematicCharacterController.meta
+
+# Package samples
+/Assets/Samples/
+/Assets/Samples.meta
+/Packages/com.kybernetik.animancer/Samples~/
+/Packages/com.kybernetik.animancer/Samples~.meta
+
+# Local animation asset packs
+/Assets/VanillaLoopStudio/
+/Assets/VanillaLoopStudio.meta
+
 # External documentation and local tools
 /Doc/
 /tools/
+
+# Local agent and Harness state
+/.claude/
+/.codex/
+/CHANGELOG.jsonl
+
+# Local server build and runtime outputs
+/server/bin/*.exe
+/example/**/*.exe
+/example/**/server.log
