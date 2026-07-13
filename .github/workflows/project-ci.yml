@@ -1,0 +1,129 @@
+name: Project CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: project-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  repository-checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Verify repository policy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $forbidden = @(git ls-files Doc tools)
+          if ($forbidden.Count -gt 0) {
+              throw "Doc or tools is still tracked:`n$($forbidden -join "`n")"
+          }
+
+          if (Test-Path 'Packages/manifest.json') {
+              Get-Content -Raw 'Packages/manifest.json' | ConvertFrom-Json | Out-Null
+          }
+
+          if (Test-Path 'ProjectSettings/ProjectVersion.txt') {
+              $projectVersion = Get-Content -Raw 'ProjectSettings/ProjectVersion.txt'
+              if ($projectVersion -notmatch '2022\.3\.62f1c1') {
+                  throw "Unexpected Unity version: $projectVersion"
+              }
+          }
+
+          "## Repository checks" >> $env:GITHUB_STEP_SUMMARY
+          "- Doc/tools are not tracked." >> $env:GITHUB_STEP_SUMMARY
+          "- JSON and Unity version checks passed when the files are present." >> $env:GITHUB_STEP_SUMMARY
+
+  unity-tests:
+    name: Unity ${{ matrix.testMode }} tests
+    if: vars.ENABLE_UNITY_CI == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        testMode: [EditMode, PlayMode]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Require a complete Unity project
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'Packages/manifest.json')) {
+              throw 'Packages/manifest.json is missing; this branch is not a reproducible Unity project.'
+          }
+          if (-not (Test-Path 'ProjectSettings/ProjectVersion.txt')) {
+              throw 'ProjectSettings/ProjectVersion.txt is missing.'
+          }
+
+      - name: Validate Unity license configuration
+        shell: pwsh
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          $missing = @('UNITY_LICENSE', 'UNITY_EMAIL', 'UNITY_PASSWORD') |
+              Where-Object { [string]::IsNullOrWhiteSpace((Get-Item "Env:$_" -ErrorAction SilentlyContinue).Value) }
+          if ($missing.Count -gt 0) {
+              throw "ENABLE_UNITY_CI=true, but required secrets are missing: $($missing -join ', ')"
+          }
+
+      - name: Run Unity tests
+        id: tests
+        uses: game-ci/unity-test-runner@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: .
+          unityVersion: auto
+          testMode: ${{ matrix.testMode }}
+          artifactsPath: artifacts/${{ matrix.testMode }}
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          checkName: Unity ${{ matrix.testMode }} results
+
+      - name: Upload Unity test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-${{ matrix.testMode }}-results
+          path: artifacts/${{ matrix.testMode }}
+
+  ci-summary:
+    name: CI summary
+    runs-on: ubuntu-latest
+    needs: [repository-checks, unity-tests]
+    if: always()
+    steps:
+      - name: Summarize enabled checks
+        shell: bash
+        env:
+          UNITY_CI_ENABLED: ${{ vars.ENABLE_UNITY_CI }}
+        run: |
+          echo "## Project CI" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repository checks: ${{ needs.repository-checks.result }}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$UNITY_CI_ENABLED" == "true" ]]; then
+            echo "- Unity tests: ${{ needs.unity-tests.result }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- Unity tests: disabled; add Unity license secrets and set ENABLE_UNITY_CI=true to enable them." >> "$GITHUB_STEP_SUMMARY"
+          fi

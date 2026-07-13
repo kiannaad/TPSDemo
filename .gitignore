@@ -68,8 +68,9 @@ sysinfo.txt
 /Assets/VanillaLoopStudio/
 /Assets/VanillaLoopStudio.meta
 
-# Local project notes
+# External documentation and local tools
 /Doc/
+/tools/
 
 # Local agent and Harness state
 /.claude/
