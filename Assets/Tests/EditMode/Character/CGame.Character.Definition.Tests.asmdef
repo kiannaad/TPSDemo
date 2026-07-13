@@ -3,7 +3,8 @@
     "rootNamespace": "CGame.Tests",
     "references": [
         "CGame.Character.Definition",
-        "CGame.Animation"
+        "CGame.Animation",
+        "CGame.Input"
     ],
     "includePlatforms": [
         "Editor"

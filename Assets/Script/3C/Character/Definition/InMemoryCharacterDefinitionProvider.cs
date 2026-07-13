@@ -33,18 +33,25 @@ namespace CGame
         {
             if (!definitionId.IsValid)
             {
-                return new CharacterDefinitionResolveResult(null, CharacterDefinitionResolveError.InvalidDefinitionId);
+                return new CharacterDefinitionResolveResult((CharacterDefinition)null, CharacterDefinitionResolveError.InvalidDefinitionId);
             }
 
             if (!definitions.TryGetValue(definitionId, out CharacterDefinition definition))
             {
-                return new CharacterDefinitionResolveResult(null, CharacterDefinitionResolveError.DefinitionNotFound);
+                return new CharacterDefinitionResolveResult((CharacterDefinition)null, CharacterDefinitionResolveError.DefinitionNotFound);
             }
 
             CharacterDefinitionResolveError validationError = definition.Validate(definitionId);
             return new CharacterDefinitionResolveResult(
                 validationError == CharacterDefinitionResolveError.None ? definition : null,
                 validationError);
+        }
+
+        public ICharacterDefinitionResolveOperation BeginResolve(CharacterDefinitionId definitionId)
+        {
+            var operation = new CharacterDefinitionResolveOperation();
+            operation.Complete(Resolve(definitionId));
+            return operation;
         }
     }
 }

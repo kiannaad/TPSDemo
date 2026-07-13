@@ -1,60 +1,78 @@
+using System;
 using UnityEngine;
-using CGame.Animation;
 
 namespace CGame
 {
     public class CharacterTestStep : ILaunchStep
     {
         private const string RuntimeRootName = "[CharacterTestRuntime]";
+        private const string LocalPlayerDefinitionId = "local-player";
 
         private GameObject runtimeRoot;
-        private CharacterRuntime runtimeCharacter;
+        private CharacterSpawnManager spawnManager;
+        private CharacterSpawnOperation spawnOperation;
+        private bool readyLogged;
 
         public void Enter()
         {
             _ = GameManager.Instance;
-            InputManager inputManager = GameManager.GetManager<InputManager>();
-            ControllerManager controllerManager = GameManager.GetManager<ControllerManager>();
-            PawnManager pawnManager = GameManager.GetManager<PawnManager>();
-            GameManager.GetManager<PhysicsManager>();
+            spawnManager = GameManager.GetManager<CharacterSpawnManager>();
 
             runtimeRoot = new GameObject(RuntimeRootName);
             CreatingCamera(runtimeRoot.transform);
             CreatingLight(runtimeRoot.transform);
             CreatingGround(runtimeRoot.transform);
 
-            CharacterDefinition definition = Resources.Load<CharacterDefinition>("CharacterDefinition");
-            if (definition == null || !definition.IsValid)
-            {
-                throw new System.InvalidOperationException("CharacterDefinition is missing or invalid.");
-            }
-
-            InputHandle playerInput = inputManager.GetHandle(InputType.Player);
-            var spawner = new CharacterRuntimeSpawner(pawnManager, controllerManager);
-            runtimeCharacter = spawner.SpawnPlayer(new PlayerCharacterSpawnRequest(
-                runtimeRoot.transform,
-                definition.VisualPrefab,
-                definition.AnimationConfig,
-                playerInput,
-                Vector3.zero,
-                Quaternion.identity,
+            spawnOperation = spawnManager.BeginSpawn(new CharacterSpawnRequest(
+                new CharacterSpawnRequestId(Guid.NewGuid().ToString("N")),
+                new CharacterDefinitionId(LocalPlayerDefinitionId),
+                CharacterControlKind.LocalPlayer,
+                new CharacterSpawnPlacement(Vector3.zero, Quaternion.identity),
+                InputType.Player,
                 "RuntimeCharacter"));
-
-            Debug.Log("[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
+            readyLogged = false;
         }
 
         public bool Update()
         {
+            if (spawnOperation == null)
+            {
+                throw new InvalidOperationException("Character spawn operation was not created.");
+            }
+
+            if (spawnOperation.State == CharacterSpawnState.Failed)
+            {
+                throw new InvalidOperationException($"Character spawn failed: {spawnOperation.Error}.");
+            }
+
+            if (spawnOperation.State == CharacterSpawnState.CharacterReady && !readyLogged)
+            {
+                readyLogged = true;
+                Debug.Log("[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
+            }
+
             return false;
         }
 
         public void Exit()
         {
-            runtimeCharacter?.Dispose();
-            runtimeCharacter = null;
+            if (spawnManager != null && spawnOperation != null)
+            {
+                if (spawnOperation.State == CharacterSpawnState.CharacterReady)
+                {
+                    spawnManager.Despawn(spawnOperation.Result.RuntimeId, CharacterDespawnReason.Requested);
+                }
+                else if (!spawnOperation.IsComplete || spawnOperation.State == CharacterSpawnState.CancelRequested)
+                {
+                    spawnManager.CancelSpawn(spawnOperation.Request.RequestId);
+                }
+            }
+
+            spawnOperation = null;
+            readyLogged = false;
             if (runtimeRoot != null)
             {
-                Object.Destroy(runtimeRoot);
+                UnityEngine.Object.Destroy(runtimeRoot);
                 runtimeRoot = null;
             }
         }
@@ -73,8 +91,9 @@ namespace CGame
             GameObject cameraObject = new GameObject("Main Camera");
             cameraObject.tag = "MainCamera";
             cameraObject.transform.SetParent(parent);
-            cameraObject.transform.position = new Vector3(0f, 8f, -10f);
-            cameraObject.transform.rotation = Quaternion.Euler(25f, 0f, 0f);
+            cameraObject.transform.position = new Vector3(0f, 2.4f, -5f);
+            cameraObject.transform.rotation = Quaternion.LookRotation(
+                new Vector3(0f, 1f, 0f) - cameraObject.transform.position);
             cameraObject.AddComponent<Camera>();
             cameraObject.AddComponent<AudioListener>();
         }

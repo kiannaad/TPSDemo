@@ -5,6 +5,7 @@ namespace CGame
     public class ControllerManager : IManager
     {
         private readonly List<IController> controllers = new List<IController>();
+        private readonly Dictionary<IController, ControllerRegistration> registrations = new Dictionary<IController, ControllerRegistration>();
 
         public override int Priority => 90;
 
@@ -13,8 +14,13 @@ namespace CGame
         /// </summary>
         public TController CreatingController<TController>() where TController : IController, new()
         {
-            TController controller = new TController();
-            RegisteringController(controller);
+            return CreateController<TController>(out _);
+        }
+
+        public TController CreateController<TController>(out IControllerRegistration registration) where TController : IController, new()
+        {
+            var controller = new TController();
+            registration = RegisterController(controller);
             return controller;
         }
 
@@ -23,12 +29,25 @@ namespace CGame
         /// </summary>
         public void RegisteringController(IController controller)
         {
-            if (controller == null || controllers.Contains(controller))
+            RegisterController(controller);
+        }
+
+        public IControllerRegistration RegisterController(IController controller)
+        {
+            if (controller == null)
             {
-                return;
+                return null;
+            }
+
+            if (registrations.TryGetValue(controller, out ControllerRegistration existing))
+            {
+                return existing;
             }
 
             controllers.Add(controller);
+            var registration = new ControllerRegistration(this, controller);
+            registrations.Add(controller, registration);
+            return registration;
         }
 
         /// <summary>
@@ -36,15 +55,12 @@ namespace CGame
         /// </summary>
         public void UnregisteringController(IController controller)
         {
-            if (!controllers.Remove(controller))
+            if (controller == null || !registrations.TryGetValue(controller, out ControllerRegistration registration))
             {
                 return;
             }
 
-            if (controller is Controller typedController)
-            {
-                typedController.UnpossessingPawn();
-            }
+            registration.Dispose();
         }
 
         /// <summary>
@@ -88,6 +104,55 @@ namespace CGame
             }
 
             controllers.Clear();
+            foreach (ControllerRegistration registration in registrations.Values)
+            {
+                registration.Invalidate();
+            }
+
+            registrations.Clear();
+        }
+
+        private void Release(ControllerRegistration registration, IController controller)
+        {
+            if (!registrations.TryGetValue(controller, out ControllerRegistration current) || current != registration)
+            {
+                return;
+            }
+
+            registrations.Remove(controller);
+            if (controllers.Remove(controller) && controller is Controller typedController)
+            {
+                typedController.UnpossessingPawn();
+            }
+        }
+
+        private sealed class ControllerRegistration : IControllerRegistration
+        {
+            private ControllerManager owner;
+            private IController controller;
+
+            public ControllerRegistration(ControllerManager owner, IController controller)
+            {
+                this.owner = owner;
+                this.controller = controller;
+            }
+
+            public bool IsActive => owner != null && controller != null;
+
+            public void Dispose()
+            {
+                ControllerManager currentOwner = owner;
+                IController currentController = controller;
+                owner = null;
+                controller = null;
+                currentOwner?.Release(this, currentController);
+            }
+
+            public void Invalidate()
+            {
+                owner = null;
+                controller = null;
+            }
         }
     }
 }

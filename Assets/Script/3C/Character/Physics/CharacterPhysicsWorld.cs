@@ -85,7 +85,14 @@ namespace CGame
             isDisposed = true;
             motors.Clear();
             movers.Clear();
-            UnityEngine.Object.Destroy(settings);
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(settings);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(settings);
+            }
         }
 
         private void PrepareInterpolation()

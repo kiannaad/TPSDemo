@@ -1,34 +1,62 @@
 using System;
 using System.Collections;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Controls;
 using UnityEngine.TestTools;
 using YooAsset;
 
 namespace CGame.Tests
 {
-    public class PhysicsInputRuntimeTests : InputTestFixture
+    public class PhysicsInputRuntimeTests
     {
-        private Keyboard keyboard;
+        private readonly PlayerInputTestDriver inputDriver = new PlayerInputTestDriver();
         private object characterTestStep;
 
         [SetUp]
-        public override void Setup()
+        public void Setup()
         {
-            base.Setup();
-            keyboard = InputSystem.AddDevice<Keyboard>();
+            EnsureCharacterStepCreated();
+        }
+
+        [UnitySetUp]
+        public IEnumerator WaitForCharacterReady()
+        {
+            EnsureCharacterStepCreated();
+            for (int i = 0; i < 120; i++)
+            {
+                characterTestStep.GetType().GetMethod("Update").Invoke(characterTestStep, null);
+                GameObject character = GameObject.Find("RuntimeCharacter");
+                if (character != null)
+                {
+                    inputDriver.Bind(character);
+                    yield break;
+                }
+
+                yield return null;
+            }
+
+            Assert.Fail("CharacterTestStep did not reach CharacterReady within 120 frames.");
+        }
+
+        private void EnsureCharacterStepCreated()
+        {
+            if (characterTestStep != null)
+            {
+                return;
+            }
 
             Type stepType = Type.GetType("CGame.CharacterTestStep, Assembly-CSharp");
             Assert.IsNotNull(stepType);
             characterTestStep = Activator.CreateInstance(stepType);
-            stepType.GetMethod("Enter").Invoke(characterTestStep, null);
+            MethodInfo enterMethod = stepType.GetMethod("Enter");
+            Assert.IsNotNull(enterMethod);
+            enterMethod.Invoke(characterTestStep, null);
         }
 
         [TearDown]
-        public override void TearDown()
+        public void TearDown()
         {
             if (characterTestStep != null)
             {
@@ -48,8 +76,7 @@ namespace CGame.Tests
                 UnityEngine.Object.DestroyImmediate(gameManager);
             }
 
-            keyboard = null;
-            base.TearDown();
+            inputDriver.ReleaseAll();
         }
 
         [UnityTest]
@@ -63,19 +90,35 @@ namespace CGame.Tests
         }
 
         [UnityTest]
+        public IEnumerator RuntimeCharacter_IsOwnedOutsideCharacterTestRoot()
+        {
+            GameObject character = GameObject.Find("RuntimeCharacter");
+            GameObject testRoot = GameObject.Find("[CharacterTestRuntime]");
+            Assert.NotNull(character);
+            Assert.NotNull(testRoot);
+            Assert.AreEqual("[CharacterRuntimeRoot]", character.transform.parent.name);
+            Assert.IsFalse(character.transform.IsChildOf(testRoot.transform));
+
+            UnityEngine.Object.Destroy(testRoot);
+            yield return null;
+
+            Assert.NotNull(GameObject.Find("RuntimeCharacter"));
+        }
+
+        [UnityTest]
         public IEnumerator HoldingForwardInput_MovesRuntimeCharacter()
         {
             GameObject character = GameObject.Find("RuntimeCharacter");
             Assert.IsNotNull(character);
             Vector3 startingPosition = character.transform.position;
 
-            Press(keyboard.wKey);
+            inputDriver.SetMove(Vector2.up);
             for (int i = 0; i < 10; i++)
             {
                 yield return null;
                 yield return new WaitForFixedUpdate();
             }
-            Release(keyboard.wKey);
+            inputDriver.ReleaseAll();
             yield return null;
 
             Assert.Greater(character.transform.position.z, startingPosition.z + 0.05f);
@@ -88,13 +131,13 @@ namespace CGame.Tests
             GameObject character = GameObject.Find("RuntimeCharacter");
             Assert.IsNotNull(character);
 
-            Press(keyboard.aKey);
+            inputDriver.SetMove(Vector2.left);
             for (int i = 0; i < 10; i++)
             {
                 yield return null;
                 yield return new WaitForFixedUpdate();
             }
-            Release(keyboard.aKey);
+            inputDriver.ReleaseAll();
             yield return null;
 
             Assert.Greater(Vector3.Dot(character.transform.forward, Vector3.left), 0.9f);
@@ -114,9 +157,9 @@ namespace CGame.Tests
 
             float groundHeight = character.transform.position.y;
             float highestPoint = groundHeight;
-            Press(keyboard.spaceKey);
+            inputDriver.SetJumpPressed(true);
             yield return null;
-            Release(keyboard.spaceKey);
+            inputDriver.ReleaseAll();
 
             for (int i = 0; i < 80; i++)
             {
@@ -148,9 +191,9 @@ namespace CGame.Tests
             float previousHipsY = hips.position.y;
             float largestCharacterStep = 0f;
             float largestHipsStep = 0f;
-            Press(keyboard.spaceKey);
+            inputDriver.SetJumpPressed(true);
             yield return null;
-            Release(keyboard.spaceKey);
+            inputDriver.ReleaseAll();
 
             for (int i = 0; i < 120; i++)
             {
@@ -171,20 +214,64 @@ namespace CGame.Tests
 
     }
 
-    public class LaunchCharacterMovementRuntimeTests : InputTestFixture
+    public sealed class CharacterTestStepLifecycleTests
     {
-        private Keyboard keyboard;
+        private object characterTestStep;
+
+        [TearDown]
+        public void TearDown()
+        {
+            characterTestStep?.GetType().GetMethod("Exit").Invoke(characterTestStep, null);
+            characterTestStep = null;
+            DestroyIfPresent("[CharacterTestRuntime]");
+            DestroyIfPresent("[GameManager]");
+        }
+
+        [UnityTest]
+        public IEnumerator ExitBeforeObservingReady_ReleasesRuntimeCharacter()
+        {
+            Type stepType = Type.GetType("CGame.CharacterTestStep, Assembly-CSharp");
+            Assert.NotNull(stepType);
+            characterTestStep = Activator.CreateInstance(stepType);
+            stepType.GetMethod("Enter").Invoke(characterTestStep, null);
+            for (int i = 0; i < 120 && GameObject.Find("RuntimeCharacter") == null; i++)
+            {
+                yield return null;
+            }
+
+            Assert.NotNull(GameObject.Find("RuntimeCharacter"));
+
+            characterTestStep.GetType().GetMethod("Exit").Invoke(characterTestStep, null);
+            characterTestStep = null;
+            Assert.NotNull(GameObject.Find("RuntimeCharacter"));
+
+            yield return null;
+
+            Assert.IsNull(GameObject.Find("RuntimeCharacter"));
+        }
+
+        private static void DestroyIfPresent(string objectName)
+        {
+            GameObject gameObject = GameObject.Find(objectName);
+            if (gameObject != null)
+            {
+                UnityEngine.Object.DestroyImmediate(gameObject);
+            }
+        }
+    }
+
+    public class LaunchCharacterMovementRuntimeTests
+    {
+        private readonly PlayerInputTestDriver inputDriver = new PlayerInputTestDriver();
         private GameObject launcherObject;
 
         [SetUp]
-        public override void Setup()
+        public void Setup()
         {
-            base.Setup();
-            keyboard = InputSystem.AddDevice<Keyboard>();
         }
 
         [TearDown]
-        public override void TearDown()
+        public void TearDown()
         {
             if (launcherObject != null)
             {
@@ -195,8 +282,7 @@ namespace CGame.Tests
             ReturnLauncherToEmptyState();
             DestroyIfPresent("[CharacterTestRuntime]");
             DestroyIfPresent("[GameManager]");
-            keyboard = null;
-            base.TearDown();
+            inputDriver.ReleaseAll();
         }
 
         [UnityTearDown]
@@ -228,8 +314,8 @@ namespace CGame.Tests
             LogAssert.Expect(LogType.Log, new Regex("退出CGame\\.PreSourceStep时间: \\d+"));
             LogAssert.Expect(LogType.Log, new Regex("进入CGame\\.EnterStep时间: \\d+"));
             LogAssert.Expect(LogType.Log, new Regex("退出CGame\\.EnterStep时间: \\d+"));
-            LogAssert.Expect(LogType.Log, "[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
             LogAssert.Expect(LogType.Log, new Regex("进入CGame\\.CharacterTestStep时间: \\d+"));
+            LogAssert.Expect(LogType.Log, "[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
 
             launcherObject = new GameObject("LaunchRuntimeTest");
             launcherObject.AddComponent(launcherMgrType);
@@ -247,15 +333,16 @@ namespace CGame.Tests
             }
 
             Assert.IsNotNull(character);
+            inputDriver.Bind(character);
             Vector3 startingPosition = character.transform.position;
 
-            Press(keyboard.wKey);
+            inputDriver.SetMove(Vector2.up);
             for (int i = 0; i < 10; i++)
             {
                 yield return null;
                 yield return new WaitForFixedUpdate();
             }
-            Release(keyboard.wKey);
+            inputDriver.ReleaseAll();
             yield return null;
 
             Assert.Greater(character.transform.position.z, startingPosition.z + 0.05f);
@@ -277,8 +364,8 @@ namespace CGame.Tests
             LogAssert.Expect(LogType.Log, new Regex(".*CGame\\.PreSourceStep.*\\d+"));
             LogAssert.Expect(LogType.Log, new Regex(".*CGame\\.EnterStep.*\\d+"));
             LogAssert.Expect(LogType.Log, new Regex(".*CGame\\.EnterStep.*\\d+"));
-            LogAssert.Expect(LogType.Log, "[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
             LogAssert.Expect(LogType.Log, new Regex(".*CGame\\.CharacterTestStep.*\\d+"));
+            LogAssert.Expect(LogType.Log, "[CharacterTest] Runtime ready. Use WASD to move and Space to jump.");
 
             launcherObject = new GameObject("LaunchArtCharacterTest");
             launcherObject.AddComponent(launcherMgrType);
@@ -291,6 +378,7 @@ namespace CGame.Tests
             }
 
             Assert.IsNotNull(character);
+            inputDriver.Bind(character);
             Transform visual = character.transform.Find("CharacterVisual");
             Assert.IsNotNull(visual);
             SkinnedMeshRenderer[] renderers = visual.GetComponentsInChildren<SkinnedMeshRenderer>();
@@ -302,21 +390,21 @@ namespace CGame.Tests
             Assert.IsTrue(animator.hasBoundPlayables);
 
             Vector3 startingPosition = character.transform.position;
-            Press(keyboard.wKey);
+            inputDriver.SetMove(Vector2.up);
             for (int i = 0; i < 10; i++)
             {
                 yield return null;
                 yield return new WaitForFixedUpdate();
             }
-            Release(keyboard.wKey);
+            inputDriver.ReleaseAll();
             Assert.Greater(character.transform.position.z, startingPosition.z + 0.05f);
 
             for (int i = 0; i < 3; i++) yield return new WaitForFixedUpdate();
             float groundHeight = character.transform.position.y;
             float highestPoint = groundHeight;
-            Press(keyboard.spaceKey);
+            inputDriver.SetJumpPressed(true);
             yield return null;
-            Release(keyboard.spaceKey);
+            inputDriver.ReleaseAll();
             for (int i = 0; i < 100; i++)
             {
                 yield return new WaitForFixedUpdate();
@@ -369,6 +457,43 @@ namespace CGame.Tests
             }
 
             return null;
+        }
+    }
+
+    internal sealed class PlayerInputTestDriver
+    {
+        private PlayerInputState state;
+
+        public void Bind(GameObject character)
+        {
+            Type pawnHostType = Type.GetType("CGame.PawnHost, Assembly-CSharp");
+            Assert.IsNotNull(pawnHostType);
+            Component pawnHost = character.GetComponent(pawnHostType);
+            Assert.IsNotNull(pawnHost);
+
+            object pawn = pawnHostType.GetProperty("Pawn")?.GetValue(pawnHost);
+            Assert.IsNotNull(pawn);
+            object controller = pawn.GetType().GetProperty("Controller")?.GetValue(pawn);
+            Assert.IsNotNull(controller);
+
+            MethodInfo setProviderMethod = controller.GetType().GetMethod("SettingInputStateProvider");
+            Assert.IsNotNull(setProviderMethod);
+            setProviderMethod.Invoke(controller, new object[] { new Func<PlayerInputState>(() => state) });
+        }
+
+        public void SetMove(Vector2 moveInput)
+        {
+            state.MoveInput = moveInput;
+        }
+
+        public void SetJumpPressed(bool jumpPressed)
+        {
+            state.JumpPressed = jumpPressed;
+        }
+
+        public void ReleaseAll()
+        {
+            state = default;
         }
     }
 }

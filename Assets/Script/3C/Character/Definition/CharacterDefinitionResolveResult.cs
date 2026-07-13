@@ -3,13 +3,19 @@ namespace CGame
     public readonly struct CharacterDefinitionResolveResult
     {
         public CharacterDefinitionResolveResult(CharacterDefinition definition, CharacterDefinitionResolveError error)
+            : this(definition == null ? null : new ResolvedCharacterDefinitionLease(definition), error)
         {
-            Definition = definition;
+        }
+
+        public CharacterDefinitionResolveResult(ResolvedCharacterDefinitionLease lease, CharacterDefinitionResolveError error)
+        {
+            Lease = lease;
             Error = error;
         }
 
-        public CharacterDefinition Definition { get; }
+        public ResolvedCharacterDefinitionLease Lease { get; }
+        public CharacterDefinition Definition => Lease?.Definition;
         public CharacterDefinitionResolveError Error { get; }
-        public bool IsSuccess => Definition != null && Error == CharacterDefinitionResolveError.None;
+        public bool IsSuccess => Lease != null && Definition != null && Error == CharacterDefinitionResolveError.None;
     }
 }

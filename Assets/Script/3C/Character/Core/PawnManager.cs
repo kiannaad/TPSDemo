@@ -5,6 +5,7 @@ namespace CGame
     public class PawnManager : IManager
     {
         private readonly List<Pawn> pawns = new List<Pawn>();
+        private readonly Dictionary<Pawn, PawnRegistration> registrations = new Dictionary<Pawn, PawnRegistration>();
 
         public override int Priority => 80;
 
@@ -13,12 +14,25 @@ namespace CGame
         /// </summary>
         public void RegisteringPawn(Pawn pawn)
         {
-            if (pawn == null || pawns.Contains(pawn))
+            RegisterPawn(pawn);
+        }
+
+        public IPawnRegistration RegisterPawn(Pawn pawn)
+        {
+            if (pawn == null)
             {
-                return;
+                return null;
+            }
+
+            if (registrations.TryGetValue(pawn, out PawnRegistration existing))
+            {
+                return existing;
             }
 
             pawns.Add(pawn);
+            var registration = new PawnRegistration(this, pawn);
+            registrations.Add(pawn, registration);
+            return registration;
         }
 
         /// <summary>
@@ -26,12 +40,12 @@ namespace CGame
         /// </summary>
         public void UnregisteringPawn(Pawn pawn)
         {
-            if (!pawns.Remove(pawn))
+            if (pawn == null || !registrations.TryGetValue(pawn, out PawnRegistration registration))
             {
                 return;
             }
 
-            pawn.ShuttingDownPawn();
+            registration.Dispose();
         }
 
         /// <summary>
@@ -78,6 +92,55 @@ namespace CGame
             }
 
             pawns.Clear();
+            foreach (PawnRegistration registration in registrations.Values)
+            {
+                registration.Invalidate();
+            }
+
+            registrations.Clear();
+        }
+
+        private void Release(PawnRegistration registration, Pawn pawn)
+        {
+            if (!registrations.TryGetValue(pawn, out PawnRegistration current) || current != registration)
+            {
+                return;
+            }
+
+            registrations.Remove(pawn);
+            if (pawns.Remove(pawn))
+            {
+                pawn.ShuttingDownPawn();
+            }
+        }
+
+        private sealed class PawnRegistration : IPawnRegistration
+        {
+            private PawnManager owner;
+            private Pawn pawn;
+
+            public PawnRegistration(PawnManager owner, Pawn pawn)
+            {
+                this.owner = owner;
+                this.pawn = pawn;
+            }
+
+            public bool IsActive => owner != null && pawn != null;
+
+            public void Dispose()
+            {
+                PawnManager currentOwner = owner;
+                Pawn currentPawn = pawn;
+                owner = null;
+                pawn = null;
+                currentOwner?.Release(this, currentPawn);
+            }
+
+            public void Invalidate()
+            {
+                owner = null;
+                pawn = null;
+            }
         }
     }
 }

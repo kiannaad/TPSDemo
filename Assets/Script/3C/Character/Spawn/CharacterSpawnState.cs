@@ -8,6 +8,9 @@ namespace CGame
         Registering,
         Possessing,
         CharacterReady,
+        CancelRequested,
+        Cancelled,
+        Released,
         Failed,
     }
 }

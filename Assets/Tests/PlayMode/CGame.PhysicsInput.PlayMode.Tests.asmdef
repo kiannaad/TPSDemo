@@ -4,6 +4,7 @@
   "references": [
     "CGame.Input",
     "CGame.Animation",
+    "CGame.Character.Definition",
     "YooAsset",
     "Unity.InputSystem",
     "Unity.InputSystem.TestFramework"
