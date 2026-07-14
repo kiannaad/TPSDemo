@@ -11,15 +11,19 @@ namespace CGame
         private GameObject runtimeRoot;
         private CharacterSpawnManager spawnManager;
         private CharacterSpawnOperation spawnOperation;
+        private CameraManager cameraManager;
+        private AimRejectionReason aimRejectionOverride;
+        private bool hasAimRejectionOverride;
         private bool readyLogged;
 
         public void Enter()
         {
             _ = GameManager.Instance;
             spawnManager = GameManager.GetManager<CharacterSpawnManager>();
+            cameraManager = GameManager.GetManager<CameraManager>();
+            cameraManager.SettingAimGameplayDecisionProvider(EvaluateAimGameplayDecision);
 
             runtimeRoot = new GameObject(RuntimeRootName);
-            CreatingCamera(runtimeRoot.transform);
             CreatingLight(runtimeRoot.transform);
             CreatingGround(runtimeRoot.transform);
 
@@ -56,6 +60,10 @@ namespace CGame
 
         public void Exit()
         {
+            cameraManager?.SettingAimGameplayDecisionProvider(null);
+            cameraManager = null;
+            hasAimRejectionOverride = false;
+            aimRejectionOverride = AimRejectionReason.None;
             if (spawnManager != null && spawnOperation != null)
             {
                 if (spawnOperation.State == CharacterSpawnState.CharacterReady)
@@ -77,6 +85,37 @@ namespace CGame
             }
         }
 
+        public void SettingAimRejectionOverride(AimRejectionReason rejectionReason)
+        {
+            if (rejectionReason == AimRejectionReason.None ||
+                rejectionReason == AimRejectionReason.IntentReleased)
+            {
+                throw new ArgumentException("The CharacterTest aim authority requires an explicit gameplay rejection.",
+                    nameof(rejectionReason));
+            }
+
+            aimRejectionOverride = rejectionReason;
+            hasAimRejectionOverride = true;
+        }
+
+        public void ClearingAimRejectionOverride()
+        {
+            hasAimRejectionOverride = false;
+            aimRejectionOverride = AimRejectionReason.None;
+        }
+
+        private AimGameplayDecision EvaluateAimGameplayDecision(bool aimHeld)
+        {
+            if (!aimHeld)
+            {
+                return AimGameplayDecision.Released;
+            }
+
+            return hasAimRejectionOverride
+                ? AimGameplayDecision.Rejected(aimRejectionOverride)
+                : AimGameplayDecision.Allowed;
+        }
+
         private static void CreatingGround(Transform parent)
         {
             GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -84,18 +123,6 @@ namespace CGame
             ground.transform.SetParent(parent);
             ground.transform.position = new Vector3(0f, -0.5f, 0f);
             ground.transform.localScale = new Vector3(20f, 1f, 20f);
-        }
-
-        private static void CreatingCamera(Transform parent)
-        {
-            GameObject cameraObject = new GameObject("Main Camera");
-            cameraObject.tag = "MainCamera";
-            cameraObject.transform.SetParent(parent);
-            cameraObject.transform.position = new Vector3(0f, 2.4f, -5f);
-            cameraObject.transform.rotation = Quaternion.LookRotation(
-                new Vector3(0f, 1f, 0f) - cameraObject.transform.position);
-            cameraObject.AddComponent<Camera>();
-            cameraObject.AddComponent<AudioListener>();
         }
 
         private static void CreatingLight(Transform parent)

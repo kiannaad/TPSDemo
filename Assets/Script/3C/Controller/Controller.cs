@@ -5,9 +5,14 @@ namespace CGame
     public class Controller : IController
     {
         private Pawn controlledPawn;
-        private Vector3 rotationInput;
+        private Vector2 rotationInput;
+        private readonly GameplayRecoilState gameplayRecoilState = new GameplayRecoilState();
 
         public Pawn ControlledPawn => controlledPawn;
+        public float ControlYaw { get; private set; }
+        public float ControlPitch { get; private set; }
+        public float MinPitch { get; private set; } = -89f;
+        public float MaxPitch { get; private set; } = 89f;
         public Quaternion ControlRotation { get; private set; } = Quaternion.identity;
 
         /// <summary>
@@ -16,7 +21,19 @@ namespace CGame
         public virtual void UpdatingController(float elapseSeconds)
         {
             UpdatingControlRotation();
+            ApplyRotationDelta(gameplayRecoilState.Advance(elapseSeconds));
             ApplyingControlRotationToPawn();
+        }
+
+        public void ApplyingGameplayRecoil(Vector2 kick, float recoveryDegreesPerSecond)
+        {
+            Vector2 appliedKick = ApplyRotationDelta(kick);
+            gameplayRecoilState.ApplyKick(appliedKick, recoveryDegreesPerSecond);
+        }
+
+        public void ClearingGameplayRecoil()
+        {
+            ApplyRotationDelta(gameplayRecoilState.Clear());
         }
 
         /// <summary>
@@ -55,7 +72,21 @@ namespace CGame
         /// </summary>
         public void SettingControlRotation(Quaternion controlRotation)
         {
-            ControlRotation = controlRotation;
+            Vector3 eulerAngles = controlRotation.eulerAngles;
+            ControlYaw = eulerAngles.y;
+            ControlPitch = Mathf.Clamp(Mathf.DeltaAngle(0f, eulerAngles.x), MinPitch, MaxPitch);
+            SynchronizeControlRotation();
+        }
+
+        /// <summary>
+        /// 设置控制俯仰范围，并立即约束当前 Pitch。
+        /// </summary>
+        public void SettingPitchLimits(float minPitch, float maxPitch)
+        {
+            MinPitch = Mathf.Min(minPitch, maxPitch);
+            MaxPitch = Mathf.Max(minPitch, maxPitch);
+            ControlPitch = Mathf.Clamp(ControlPitch, MinPitch, MaxPitch);
+            SynchronizeControlRotation();
         }
 
         /// <summary>
@@ -75,25 +106,19 @@ namespace CGame
         }
 
         /// <summary>
-        /// 累加翻滚旋转输入。
-        /// </summary>
-        public void AddingRollInput(float value)
-        {
-            rotationInput.z += value;
-        }
-
-        /// <summary>
         /// 按 UE 风格消费本帧旋转输入并更新控制旋转。
         /// </summary>
         protected virtual void UpdatingControlRotation()
         {
-            if (rotationInput == Vector3.zero)
+            if (rotationInput == Vector2.zero)
             {
                 return;
             }
 
-            ControlRotation = Quaternion.Euler(rotationInput) * ControlRotation;
-            rotationInput = Vector3.zero;
+            ControlPitch = Mathf.Clamp(ControlPitch + rotationInput.x, MinPitch, MaxPitch);
+            ControlYaw += rotationInput.y;
+            rotationInput = Vector2.zero;
+            SynchronizeControlRotation();
         }
 
         /// <summary>
@@ -102,6 +127,26 @@ namespace CGame
         protected virtual void ApplyingControlRotationToPawn()
         {
             controlledPawn?.ApplyingControlRotation(ControlRotation);
+        }
+
+        private void SynchronizeControlRotation()
+        {
+            ControlRotation = Quaternion.Euler(ControlPitch, ControlYaw, 0f);
+        }
+
+        private Vector2 ApplyRotationDelta(Vector2 delta)
+        {
+            if (delta == Vector2.zero)
+            {
+                return Vector2.zero;
+            }
+
+            float previousPitch = ControlPitch;
+            float previousYaw = ControlYaw;
+            ControlPitch = Mathf.Clamp(ControlPitch + delta.x, MinPitch, MaxPitch);
+            ControlYaw += delta.y;
+            SynchronizeControlRotation();
+            return new Vector2(ControlPitch - previousPitch, ControlYaw - previousYaw);
         }
     }
 }

@@ -21,7 +21,7 @@ namespace CGame
             };
 
         private readonly PlayerInput input;
-        private readonly List<PlayerInput.IPlayerActions> _callbacks = new List<PlayerInput.IPlayerActions>();
+        private readonly List<PlayerInput.IPlayerActions> callbacks = new List<PlayerInput.IPlayerActions>();
 
         /// <summary>
         /// 创建 Player 输入容器。
@@ -39,7 +39,7 @@ namespace CGame
         public void AddCallbacks(PlayerInput.IPlayerActions cb)
         {
             input.Player.AddCallbacks(cb);
-            _callbacks.Add(cb);
+            callbacks.Add(cb);
         }
 
         /// <summary>
@@ -48,7 +48,7 @@ namespace CGame
         public void RemoveCallbacks(PlayerInput.IPlayerActions cb)
         {
             input.Player.RemoveCallbacks(cb);
-            _callbacks.Remove(cb);
+            callbacks.Remove(cb);
         }
 
         /// <summary>
@@ -77,7 +77,7 @@ namespace CGame
             State = new PlayerInputState
             {
                 MoveInput = input.Player.Move.ReadValue<Vector2>(),
-                LookInput = input.Player.Look.ReadValue<Vector2>(),
+                LookInput = ReadLookInput(),
                 FirePressed = input.Player.Fire.WasPressedThisFrame(),
                 FireHeld = input.Player.Fire.IsPressed(),
                 JumpPressed = input.Player.Jump.WasPressedThisFrame(),
@@ -91,12 +91,28 @@ namespace CGame
         /// </summary>
         protected override void ClearingContainerCallbacks()
         {
-            for (int i = 0; i < _callbacks.Count; i++)
+            for (int i = 0; i < callbacks.Count; i++)
             {
-                input.Player.RemoveCallbacks(_callbacks[i]);
+                input.Player.RemoveCallbacks(callbacks[i]);
             }
 
-            _callbacks.Clear();
+            callbacks.Clear();
+        }
+
+        private LookInputValue ReadLookInput()
+        {
+            InputAction lookAction = input.Player.Look;
+            Vector2 value = lookAction.ReadValue<Vector2>();
+
+            if (lookAction.activeControl == null)
+            {
+                return new LookInputValue(Vector2.zero, LookInputTimeMode.None);
+            }
+
+            LookInputTimeMode timeMode = lookAction.activeControl.device is Pointer
+                ? LookInputTimeMode.Delta
+                : LookInputTimeMode.Rate;
+            return new LookInputValue(value, timeMode);
         }
     }
 }

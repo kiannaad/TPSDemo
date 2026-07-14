@@ -21,6 +21,12 @@ namespace CGame.Animation
         public float MoveSpeed { get; set; }
         public float OverlayWeight { get; set; }
         public float LeftHandIkWeight { get; set; }
+        public float ObserverBodyYaw { get; set; }
+        public float ObserverAimYawOffset { get; set; }
+        public float ObserverAimPitch { get; set; }
+        public float ObserverAimWeight { get; set; }
+        public float ObserverAdsWeight { get; set; }
+        public ObserverWeaponState ObserverWeaponState { get; set; }
         public Vector3 WorldVelocity { get; set; }
         public Vector3 LocalVelocity { get; set; }
         public Vector3 WorldAcceleration { get; set; }

@@ -13,6 +13,7 @@ namespace CGame.Tests
         private CGame.InputManager inputManager;
         private Keyboard keyboard;
         private Mouse mouse;
+        private Gamepad gamepad;
 
         /// <summary>
         /// 初始化隔离的 InputSystem 测试环境，并创建输入管理器。
@@ -24,6 +25,7 @@ namespace CGame.Tests
 
             keyboard = InputSystem.AddDevice<Keyboard>();
             mouse = InputSystem.AddDevice<Mouse>();
+            gamepad = InputSystem.AddDevice<Gamepad>();
             inputManager = new CGame.InputManager();
             InvokeManagerMethod("Init");
         }
@@ -38,6 +40,7 @@ namespace CGame.Tests
             inputManager = null;
             keyboard = null;
             mouse = null;
+            gamepad = null;
 
             base.TearDown();
         }
@@ -231,7 +234,7 @@ namespace CGame.Tests
 
             Set(mouse.delta, new Vector2(3f, -2f));
             UpdateInputManager();
-            AssertMove(playerHandle.GetState<PlayerInputState>().LookInput, 3f, -2f);
+            AssertMove(playerHandle.GetState<PlayerInputState>().LookInput.Value, 3f, -2f);
 
             Press(mouse.leftButton);
             UpdateInputManager();
@@ -258,6 +261,46 @@ namespace CGame.Tests
             Assert.IsTrue(playerHandle.GetState<PlayerInputState>().AimHeld);
             Release(mouse.rightButton);
             UpdateInputManager();
+        }
+
+        /// <summary>
+        /// 验证 Pointer Delta 保留逐帧增量语义，不随 deltaTime 重复缩放。
+        /// </summary>
+        [Test]
+        public void PointerLook_PreservesDeltaTimeMode()
+        {
+            Set(mouse.delta, new Vector2(12f, -6f));
+            UpdateInputManager();
+
+            LookInputValue lookInput = inputManager
+                .GetHandle(InputType.Player)
+                .GetState<PlayerInputState>()
+                .LookInput;
+
+            Assert.AreEqual(LookInputTimeMode.Delta, lookInput.TimeMode);
+            AssertMove(lookInput.Value, 12f, -6f);
+            AssertMove(lookInput.ResolveFrameDelta(1f / 30f), 12f, -6f);
+            AssertMove(lookInput.ResolveFrameDelta(1f / 144f), 12f, -6f);
+        }
+
+        /// <summary>
+        /// 验证 Gamepad Right Stick 保留按秒速率语义，并按 deltaTime 计算逐帧增量。
+        /// </summary>
+        [Test]
+        public void GamepadLook_PreservesRateTimeMode()
+        {
+            Set(gamepad.rightStick, Vector2.right);
+            UpdateInputManager();
+
+            LookInputValue lookInput = inputManager
+                .GetHandle(InputType.Player)
+                .GetState<PlayerInputState>()
+                .LookInput;
+
+            Assert.AreEqual(LookInputTimeMode.Rate, lookInput.TimeMode);
+            AssertMove(lookInput.Value, 1f, 0f);
+            AssertMove(lookInput.ResolveFrameDelta(0.02f), 0.02f, 0f);
+            AssertMove(lookInput.ResolveFrameDelta(0.01f), 0.01f, 0f);
         }
 
         [Test]
