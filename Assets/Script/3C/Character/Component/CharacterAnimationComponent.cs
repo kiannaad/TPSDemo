@@ -11,6 +11,7 @@ namespace CGame
         private readonly CharacterAnimationConfig config;
         private Pawn owner;
         private CharacterAnimInstance animInstance;
+        private CharacterWeaponAnimationBridge weaponAnimationBridge;
         private Vector3 previousLocation;
         private Quaternion previousRotation;
         private Vector3 previousVelocity;
@@ -35,6 +36,7 @@ namespace CGame
         {
             owner = pawn;
             animInstance = new CharacterAnimInstance(animator, config);
+            weaponAnimationBridge = new CharacterWeaponAnimationBridge(animator, config, animInstance.Graph);
             previousLocation = motor.transform.position;
             previousRotation = motor.transform.rotation;
             previousVelocity = motor.Velocity;
@@ -81,6 +83,12 @@ namespace CGame
                 isFalling,
                 timeToJumpApex);
             animInstance.UpdatePhysicalProperties(frameData);
+            WeaponEquipmentSnapshot equipmentSnapshot = owner.Controller != null
+                ? owner.Controller.WeaponRuntime.Snapshot
+                : default;
+            weaponAnimationBridge.BindRuntime(owner.Controller?.WeaponRuntime);
+            CalculateAim(rotation, owner.ControlRotation, out float aimYaw, out float aimPitch);
+            weaponAnimationBridge.Update(equipmentSnapshot, aimYaw, aimPitch, elapseSeconds);
             animInstance.UpdateAnimation(elapseSeconds);
             previousLocation = location;
             previousRotation = rotation;
@@ -90,9 +98,19 @@ namespace CGame
 
         public void ShuttingDownComponent()
         {
+            owner?.Controller?.WeaponRuntime.DisposeActiveAction();
+            weaponAnimationBridge?.Dispose();
+            weaponAnimationBridge = null;
             animInstance?.Dispose();
             animInstance = null;
             owner = null;
+        }
+
+        private static void CalculateAim(Quaternion characterRotation, Quaternion controlRotation, out float yaw, out float pitch)
+        {
+            Vector3 localForward = Quaternion.Inverse(characterRotation) * (controlRotation * Vector3.forward);
+            yaw = Mathf.Atan2(localForward.x, localForward.z) * Mathf.Rad2Deg;
+            pitch = -Mathf.Asin(Mathf.Clamp(localForward.y, -1f, 1f)) * Mathf.Rad2Deg;
         }
     }
 }

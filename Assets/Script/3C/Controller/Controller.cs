@@ -6,9 +6,36 @@ namespace CGame
     {
         private Pawn controlledPawn;
         private Vector3 rotationInput;
+        private readonly WeaponRuntime weaponRuntime = new WeaponRuntime();
 
         public Pawn ControlledPawn => controlledPawn;
         public Quaternion ControlRotation { get; private set; } = Quaternion.identity;
+        public WeaponRuntime WeaponRuntime => weaponRuntime;
+
+        public bool RequestEquipWeapon(WeaponId weaponId)
+        {
+            return weaponRuntime.RequestEquip(weaponId);
+        }
+
+        public bool RequestUnequipWeapon()
+        {
+            return weaponRuntime.RequestUnequip();
+        }
+
+        public bool RequestFireWeapon(out WeaponActionFact action)
+        {
+            return weaponRuntime.RequestFire(out action);
+        }
+
+        public bool CompleteWeaponAction(ulong actionId)
+        {
+            return weaponRuntime.CompleteAction(actionId);
+        }
+
+        public bool CancelWeaponAction(ulong actionId, WeaponActionEndReason reason = WeaponActionEndReason.Cancelled)
+        {
+            return weaponRuntime.CancelAction(actionId, reason);
+        }
 
         /// <summary>
         /// 更新控制器逻辑，并把控制旋转同步给当前 Pawn。

@@ -11,6 +11,10 @@ namespace CGame.Animation
         private AnimationClipPlayable clipPlayable;
         private AnimationNotifyRuntime notifyRuntime;
         private bool requested;
+        private ulong pendingRequestId;
+        private float presentationTime;
+
+        public event Action<ActionPresentationEnded> PresentationEnded;
 
         public ActionNode(AnimationClipAsset clipAsset, int priority)
         {
@@ -22,9 +26,17 @@ namespace CGame.Animation
         public bool IsActive { get; private set; }
         public float Weight { get; internal set; }
         public AnimationClipPlayable ClipPlayable => clipPlayable;
+        public ulong RequestId { get; private set; }
+        public ulong PendingRequestId => requested ? pendingRequestId : 0ul;
 
         public void Request()
         {
+            Request(0ul);
+        }
+
+        public void Request(ulong requestId)
+        {
+            pendingRequestId = requestId;
             requested = true;
         }
 
@@ -35,9 +47,26 @@ namespace CGame.Animation
                 return;
             }
 
-            notifyRuntime?.EndAll(AnimationNotifyEndReason.Interrupted);
-            IsActive = false;
-            Weight = 0f;
+            Finish(ActionPresentationEndReason.Interrupted, AnimationNotifyEndReason.Interrupted);
+        }
+
+        public bool End(ulong requestId, ActionPresentationEndReason reason)
+        {
+            if (requested && pendingRequestId == requestId)
+            {
+                requested = false;
+                pendingRequestId = 0ul;
+                PresentationEnded?.Invoke(new ActionPresentationEnded(requestId, reason));
+                return true;
+            }
+
+            if (!IsActive || RequestId != requestId)
+            {
+                return false;
+            }
+
+            Finish(reason, AnimationNotifyEndReason.Interrupted);
+            return true;
         }
 
         public override void Update(AnimationGraphContext context, float deltaTime)
@@ -45,9 +74,17 @@ namespace CGame.Animation
             if (requested)
             {
                 requested = false;
+                if (IsActive)
+                {
+                    Finish(ActionPresentationEndReason.Interrupted, AnimationNotifyEndReason.Interrupted);
+                }
+
                 IsActive = true;
+                RequestId = pendingRequestId;
+                pendingRequestId = 0ul;
                 clipPlayable.SetTime(0d);
                 clipPlayable.SetDone(false);
+                presentationTime = 0f;
                 context.RecordDebugEvent(nameof(ActionNode), $"Started:{Priority}", 1f);
             }
 
@@ -56,13 +93,13 @@ namespace CGame.Animation
                 return;
             }
 
-            float currentTime = Mathf.Max(0f, (float)clipPlayable.GetTime());
+            presentationTime += Mathf.Max(0f, deltaTime) * Mathf.Max(0f, clipAsset.Speed);
+            float currentTime = Mathf.Max(presentationTime, Mathf.Max(0f, (float)clipPlayable.GetTime()));
+            presentationTime = currentTime;
             notifyRuntime.Tick(currentTime, deltaTime, Weight);
             if (currentTime >= clipAsset.AnimationClip.length)
             {
-                notifyRuntime.EndAll(AnimationNotifyEndReason.NaturalEnd);
-                IsActive = false;
-                Weight = 0f;
+                Finish(ActionPresentationEndReason.NaturalEnd, AnimationNotifyEndReason.NaturalEnd);
                 context.RecordDebugEvent(nameof(ActionNode), $"Ended:{Priority}", currentTime);
             }
         }
@@ -92,7 +129,27 @@ namespace CGame.Animation
 
         protected override void OnDestroy()
         {
-            notifyRuntime?.EndAll(AnimationNotifyEndReason.Interrupted);
+            if (IsActive)
+            {
+                Finish(ActionPresentationEndReason.OwnerDisposed, AnimationNotifyEndReason.OwnerDisabled);
+            }
+            else
+            {
+                notifyRuntime?.EndAll(AnimationNotifyEndReason.OwnerDisabled);
+            }
+        }
+
+        private void Finish(ActionPresentationEndReason reason, AnimationNotifyEndReason notifyReason)
+        {
+            ulong endedRequestId = RequestId;
+            notifyRuntime?.EndAll(notifyReason);
+            IsActive = false;
+            Weight = 0f;
+            RequestId = 0ul;
+            if (endedRequestId > 0ul)
+            {
+                PresentationEnded?.Invoke(new ActionPresentationEnded(endedRequestId, reason));
+            }
         }
     }
 }
