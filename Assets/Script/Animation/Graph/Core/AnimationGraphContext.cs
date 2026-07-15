@@ -25,6 +25,12 @@ namespace CGame.Animation
         public float AimPitch { get; set; }
         public float AimWeight { get; set; }
         public uint ActiveWeaponGeneration { get; set; }
+        public float ObserverBodyYaw { get; set; }
+        public float ObserverAimYawOffset { get; set; }
+        public float ObserverAimPitch { get; set; }
+        public float ObserverAimWeight { get; set; }
+        public float ObserverAdsWeight { get; set; }
+        public ObserverWeaponState ObserverWeaponState { get; set; }
         public Vector3 WorldVelocity { get; set; }
         public Vector3 LocalVelocity { get; set; }
         public Vector3 WorldAcceleration { get; set; }

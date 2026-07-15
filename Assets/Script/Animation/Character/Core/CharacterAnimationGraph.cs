@@ -24,6 +24,8 @@ namespace CGame.Animation
         private readonly AimOffsetNode aimOffsetNode;
         private readonly RecoilReactionNode recoilReactionNode;
         private readonly HumanoidLeftHandIkNode leftHandIkNode;
+        private readonly Transform observerSpine;
+        private readonly Transform observerChest;
         private WeaponAnimationDefinition appliedWeaponDefinition;
         private WeaponEquipmentSnapshot appliedWeaponSnapshot;
 
@@ -90,7 +92,16 @@ namespace CGame.Animation
                 locomotionStateMachine.StatePhaseChanged += OnStatePhaseChanged;
             }
 
-            if (animator.isHuman && animator.GetBoneTransform(HumanBodyBones.LeftHand) != null)
+            Transform spine = animator.GetBoneTransform(HumanBodyBones.Spine);
+            Transform chest = animator.GetBoneTransform(HumanBodyBones.UpperChest)
+                ?? animator.GetBoneTransform(HumanBodyBones.Chest);
+            observerSpine = chest != null
+                ? spine
+                : animator.GetBoneTransform(HumanBodyBones.Neck) ?? spine;
+            observerChest = chest ?? animator.GetBoneTransform(HumanBodyBones.Head);
+
+            Transform leftHand = animator.GetBoneTransform(HumanBodyBones.LeftHand);
+            if (animator.isHuman && leftHand != null)
             {
                 leftHandIkNode = new HumanoidLeftHandIkNode(root);
                 root = leftHandIkNode;
@@ -252,6 +263,7 @@ namespace CGame.Animation
         public void Update(float deltaTime)
         {
             output.Update(deltaTime);
+            ApplyObserverAim();
         }
 
         public AnimationGraphDebugSnapshot GetDebugSnapshot() => output.GetGraphDebugSnapshot();
@@ -269,6 +281,40 @@ namespace CGame.Animation
             {
                 inertializationNode?.Request(0.12f);
             }
+        }
+
+        private void ApplyObserverAim()
+        {
+            AnimationGraphContext context = Context;
+            if (observerSpine == null || context.ObserverAimWeight <= 0f)
+            {
+                return;
+            }
+
+            bool hasChest = observerChest != null && observerChest != observerSpine;
+            float spineShare = hasChest ? 0.4f : 0.65f;
+            ApplyObserverAimRotation(observerSpine, context, spineShare);
+            if (hasChest)
+            {
+                ApplyObserverAimRotation(observerChest, context, 0.6f);
+            }
+        }
+
+        private static void ApplyObserverAimRotation(
+            Transform bone,
+            AnimationGraphContext context,
+            float share)
+        {
+            Quaternion poseRotation = bone.localRotation;
+            Quaternion aimOffset = Quaternion.Euler(
+                -context.ObserverAimPitch * share,
+                context.ObserverAimYawOffset * share,
+                0f);
+            Quaternion aimedRotation = poseRotation * aimOffset;
+            bone.localRotation = Quaternion.Slerp(
+                poseRotation,
+                aimedRotation,
+                Mathf.Clamp01(context.ObserverAimWeight));
         }
 
         private static ClipNode CreateOneShot(AnimationClip clip)

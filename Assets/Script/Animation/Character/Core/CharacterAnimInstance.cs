@@ -43,6 +43,30 @@ namespace CGame.Animation
             graph.ApplyWeaponEquipment(snapshot);
         }
 
+        public void UpdateObserverPresentation(ObserverAimPresentationSnapshot snapshot)
+        {
+            AnimationGraphContext context = graph.Context;
+            context.ObserverBodyYaw = snapshot.BodyYaw;
+            context.ObserverAimYawOffset = snapshot.AimYawOffset;
+            context.ObserverAimPitch = snapshot.AimPitch;
+            context.ObserverAimWeight = snapshot.AimWeight;
+            context.ObserverAdsWeight = snapshot.AdsWeight;
+            context.ObserverWeaponState = snapshot.WeaponState;
+            context.LeftHandIkWeight = snapshot.LeftHandIkWeight;
+        }
+
+        public void ClearObserverPresentation()
+        {
+            AnimationGraphContext context = graph.Context;
+            context.ObserverBodyYaw = 0f;
+            context.ObserverAimYawOffset = 0f;
+            context.ObserverAimPitch = 0f;
+            context.ObserverAimWeight = 0f;
+            context.ObserverAdsWeight = 0f;
+            context.ObserverWeaponState = ObserverWeaponState.Holstered;
+            context.LeftHandIkWeight = 0f;
+        }
+
         public void Dispose() => graph.Dispose();
     }
 }

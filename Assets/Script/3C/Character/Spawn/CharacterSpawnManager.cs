@@ -31,6 +31,7 @@ namespace CGame
 
         public override int Priority => 60;
         public event Action<CharacterRuntimeId> CharacterReady;
+        public event Action<CharacterRuntimeId, CharacterDespawnReason> CharacterReleasing;
         public event Action<CharacterRuntimeId, CharacterDespawnReason> CharacterReleased;
 
         public void ConfigureDefinitionProvider(ICharacterDefinitionProvider configuredProvider)
@@ -401,6 +402,7 @@ namespace CGame
                 return;
             }
 
+            PublishReleasing(runtimeId, reason);
             runtime.Dispose();
             if (views.TryGetValue(runtimeId, out CharacterView view))
             {
@@ -456,6 +458,18 @@ namespace CGame
             try
             {
                 CharacterReleased?.Invoke(runtimeId, reason);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        private void PublishReleasing(CharacterRuntimeId runtimeId, CharacterDespawnReason reason)
+        {
+            try
+            {
+                CharacterReleasing?.Invoke(runtimeId, reason);
             }
             catch (Exception exception)
             {

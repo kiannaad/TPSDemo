@@ -51,13 +51,15 @@ namespace CGame
                 return;
             }
 
-            Vector3 movementInput = Vector3.ProjectOnPlane(owner.PeekingMovementInput(), Vector3.up);
-            if (movementInput.sqrMagnitude <= 0.0001f)
+            Vector3 aimForward = Vector3.ProjectOnPlane(
+                owner.ControlRotation * Vector3.forward,
+                Vector3.up);
+            if (aimForward.sqrMagnitude <= 0.0001f)
             {
                 return;
             }
 
-            Quaternion targetRotation = Quaternion.LookRotation(movementInput.normalized, Vector3.up);
+            Quaternion targetRotation = Quaternion.LookRotation(aimForward.normalized, Vector3.up);
             currentRotation = Quaternion.RotateTowards(
                 currentRotation,
                 targetRotation,
