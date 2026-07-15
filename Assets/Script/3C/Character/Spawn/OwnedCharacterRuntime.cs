@@ -8,7 +8,7 @@ namespace CGame
         private GameObject root;
         private PawnHost pawnHost;
         private CharacterPhysicsMotor motor;
-        private LocalPlayerControllerBinding controllerBinding;
+        private ICharacterControllerBinding controllerBinding;
         private IPawnRegistration pawnRegistration;
         private ResolvedCharacterDefinitionLease definitionLease;
 
@@ -16,7 +16,7 @@ namespace CGame
             GameObject root,
             PawnHost pawnHost,
             CharacterPhysicsMotor motor,
-            LocalPlayerControllerBinding controllerBinding,
+            ICharacterControllerBinding controllerBinding,
             IPawnRegistration pawnRegistration,
             ResolvedCharacterDefinitionLease definitionLease)
         {

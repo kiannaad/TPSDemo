@@ -2,7 +2,7 @@ using System;
 
 namespace CGame
 {
-    public sealed class LocalPlayerControllerBinding : IDisposable
+    public sealed class LocalPlayerControllerBinding : ICharacterControllerBinding
     {
         private PlayerController controller;
         private IControllerRegistration registration;
