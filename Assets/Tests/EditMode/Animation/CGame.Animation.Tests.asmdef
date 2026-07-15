@@ -3,6 +3,7 @@
     "rootNamespace": "CGame.Tests",
     "references": [
         "CGame.Animation",
+        "CGame.Weapon",
         "CGame.Animation.Editor",
         "Kybernetik.Animancer"
     ],

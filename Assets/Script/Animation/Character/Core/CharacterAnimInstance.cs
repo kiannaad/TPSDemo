@@ -31,12 +31,16 @@ namespace CGame.Animation
             context.YawDeltaSpeed = frameData.YawDeltaSpeed;
             context.TimeToJumpApex = frameData.TimeToJumpApex;
             context.OverlayWeight = 0f;
-            context.LeftHandIkWeight = 0f;
         }
 
         public void UpdateAnimation(float deltaTime)
         {
             graph.Update(deltaTime);
+        }
+
+        public void ApplyWeaponEquipment(WeaponEquipmentSnapshot snapshot)
+        {
+            graph.ApplyWeaponEquipment(snapshot);
         }
 
         public void UpdateObserverPresentation(ObserverAimPresentationSnapshot snapshot)

@@ -21,6 +21,10 @@ namespace CGame.Animation
         public float MoveSpeed { get; set; }
         public float OverlayWeight { get; set; }
         public float LeftHandIkWeight { get; set; }
+        public float AimYaw { get; set; }
+        public float AimPitch { get; set; }
+        public float AimWeight { get; set; }
+        public uint ActiveWeaponGeneration { get; set; }
         public float ObserverBodyYaw { get; set; }
         public float ObserverAimYawOffset { get; set; }
         public float ObserverAimPitch { get; set; }

@@ -12,6 +12,7 @@ namespace CGame.Animation
         [SerializeField] private AnimationClipAsset jumpStart;
         [SerializeField] private AnimationClipAsset inAir;
         [SerializeField] private AnimationClipAsset land;
+        [SerializeField] private WeaponAnimationDefinition[] weaponDefinitions;
 
         public AnimationClipAsset Idle => idle;
         public AnimationClipAsset Walk => walk;
@@ -20,6 +21,7 @@ namespace CGame.Animation
         public AnimationClipAsset JumpStart => jumpStart;
         public AnimationClipAsset InAir => inAir;
         public AnimationClipAsset Land => land;
+        public WeaponAnimationDefinition[] WeaponDefinitions => weaponDefinitions;
 
         public bool IsValid => IsValidAsset(idle)
             && IsValidAsset(walk)

@@ -79,6 +79,48 @@ namespace CGame.Tests
         }
 
         [Test]
+        public void AnimInstance_EquipmentSnapshotDrivesWeaponLayerAndUnequipFallback()
+        {
+            CharacterAnimationConfig config = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
+            Assert.AreEqual(1, config.WeaponDefinitions.Length);
+            WeaponAnimationDefinition definition = config.WeaponDefinitions[0];
+            Assert.AreEqual(new WeaponId("rifle"), definition.WeaponId);
+            Assert.IsTrue(definition.Idle.AnimationClip.isHumanMotion);
+            Assert.IsTrue(definition.Walk.AnimationClip.isHumanMotion);
+            Assert.IsTrue(definition.Run.AnimationClip.isHumanMotion);
+            GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(LoadVisualPrefab());
+            CharacterAnimInstance instance = null;
+            try
+            {
+                instance = new CharacterAnimInstance(visual.GetComponentInChildren<Animator>(), config);
+                Update(instance, Vector3.zero, true);
+
+                instance.ApplyWeaponEquipment(new WeaponEquipmentSnapshot(new WeaponId("rifle"), 1u));
+                Update(instance, Vector3.zero, true, 0.2f);
+
+                Assert.AreEqual(new WeaponId("rifle"), instance.Graph.EquippedWeaponId);
+                Assert.AreEqual(1u, instance.Graph.WeaponGeneration);
+                Assert.IsNotNull(instance.Graph.WeaponLayerBlend.CurrentLayer);
+                Assert.AreEqual("Idle", instance.Graph.WeaponLayerBlend.CurrentLayer.SelectedLocomotionState);
+
+                Update(instance, new Vector3(0f, 0f, 2f), true);
+                Assert.AreEqual("Move", instance.Graph.CurrentLocomotionState);
+                Assert.AreEqual("Move", instance.Graph.WeaponLayerBlend.CurrentLayer.SelectedLocomotionState);
+
+                instance.ApplyWeaponEquipment(new WeaponEquipmentSnapshot(default, 2u));
+                Update(instance, Vector3.zero, true, 0.2f);
+                Assert.IsNull(instance.Graph.WeaponLayerBlend.CurrentLayer);
+                Assert.IsNull(instance.Graph.WeaponLayerBlend.NextLayer);
+                Assert.IsFalse(instance.Graph.EquippedWeaponId.IsValid);
+            }
+            finally
+            {
+                instance?.Dispose();
+                Object.DestroyImmediate(visual);
+            }
+        }
+
+        [Test]
         public void CharacterConfig_ReferencesOnlyExpectedArtAssets()
         {
             CharacterAnimationConfig config = Resources.Load<CharacterAnimationConfig>("CharacterAnimationConfig");
@@ -94,7 +136,7 @@ namespace CGame.Tests
             }
         }
 
-        private static void Update(CharacterAnimInstance instance, Vector3 velocity, bool grounded)
+        private static void Update(CharacterAnimInstance instance, Vector3 velocity, bool grounded, float deltaTime = 0.016f)
         {
             bool jumping = !grounded && velocity.y > 0f;
             bool falling = !grounded && velocity.y <= 0f;
@@ -111,7 +153,7 @@ namespace CGame.Tests
                 falling,
                 jumping ? velocity.y / 9.81f : 0f);
             instance.UpdatePhysicalProperties(frame);
-            instance.UpdateAnimation(0.016f);
+            instance.UpdateAnimation(deltaTime);
         }
 
         private static GameObject LoadVisualPrefab()
