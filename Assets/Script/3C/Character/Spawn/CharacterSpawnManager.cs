@@ -23,6 +23,8 @@ namespace CGame
         private ICharacterDefinitionProvider definitionProvider;
         private CharacterAssembler assembler;
         private LocalPlayerControllerBinder localPlayerBinder;
+        private AIControllerBinder aiControllerBinder;
+        private AIRuntimeRegistry aiRuntimeRegistry;
         private PawnManager pawnManager;
         private ControllerManager controllerManager;
         private Transform runtimeRoot;
@@ -31,6 +33,22 @@ namespace CGame
         public event Action<CharacterRuntimeId> CharacterReady;
         public event Action<CharacterRuntimeId, CharacterDespawnReason> CharacterReleasing;
         public event Action<CharacterRuntimeId, CharacterDespawnReason> CharacterReleased;
+
+        public void ConfigureDefinitionProvider(ICharacterDefinitionProvider configuredProvider)
+        {
+            if (configuredProvider == null)
+            {
+                throw new ArgumentNullException(nameof(configuredProvider));
+            }
+
+            if (operations.Count > 0 || runtimes.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "The character definition provider cannot be replaced after spawning has started.");
+            }
+
+            definitionProvider = configuredProvider;
+        }
 
         public CharacterSpawnOperation BeginSpawn(CharacterSpawnRequest request)
         {
@@ -87,6 +105,17 @@ namespace CGame
             return false;
         }
 
+        public bool TryGetAIRuntime(CharacterRuntimeId runtimeId, out AIRuntimeRegistration registration)
+        {
+            if (aiRuntimeRegistry != null)
+            {
+                return aiRuntimeRegistry.TryGet(runtimeId, out registration);
+            }
+
+            registration = null;
+            return false;
+        }
+
         public bool Despawn(CharacterRuntimeId runtimeId, CharacterDespawnReason reason = CharacterDespawnReason.Requested)
         {
             if (!runtimes.ContainsKey(runtimeId) || !queuedRuntimeIds.Add(runtimeId))
@@ -107,6 +136,11 @@ namespace CGame
             definitionProvider = new YooAssetCharacterDefinitionProvider(global::AssetManager.Instance);
             assembler = new CharacterAssembler();
             localPlayerBinder = new LocalPlayerControllerBinder(inputManager, controllerManager);
+            aiRuntimeRegistry = new AIRuntimeRegistry();
+            aiControllerBinder = new AIControllerBinder(
+                controllerManager,
+                aiRuntimeRegistry,
+                Resources.Load<AIPrototypeLoadout>("AIPrototypeLoadout"));
             runtimeRoot = new GameObject("[CharacterRuntimeRoot]").transform;
         }
 
@@ -163,6 +197,9 @@ namespace CGame
             terminalRequestIds.Clear();
             pendingDespawns.Clear();
             queuedRuntimeIds.Clear();
+            aiRuntimeRegistry?.Shutdown();
+            aiRuntimeRegistry = null;
+            aiControllerBinder = null;
             if (runtimeRoot != null)
             {
                 if (Application.isPlaying)
@@ -191,7 +228,8 @@ namespace CGame
                             break;
                         }
 
-                        if (operation.Request.ControlKind != CharacterControlKind.LocalPlayer)
+                        if (operation.Request.ControlKind != CharacterControlKind.LocalPlayer
+                            && operation.Request.ControlKind != CharacterControlKind.AI)
                         {
                             Fail(operation, CharacterSpawnError.UnsupportedControlKind);
                             break;
@@ -245,11 +283,11 @@ namespace CGame
                         break;
                     case CharacterSpawnState.Possessing:
                         CharacterAssembly readyAssembly = assemblies[operation];
-                        LocalPlayerControllerBinding binding = localPlayerBinder.Bind(readyAssembly.Character, operation.Request.InputType);
+                        var runtimeId = new CharacterRuntimeId(Guid.NewGuid().ToString("N"));
+                        ICharacterControllerBinding binding = BindController(operation.Request, runtimeId, readyAssembly);
                         try
                         {
                             readyAssembly.Root.SetActive(true);
-                            var runtimeId = new CharacterRuntimeId(Guid.NewGuid().ToString("N"));
                             IPawnRegistration readyPawnRegistration = pawnRegistrations[operation];
                             ResolvedCharacterDefinitionLease readyDefinitionLease = definitionLeases[operation];
                             readyAssembly.TransferRuntimeOwnership();
@@ -449,6 +487,22 @@ namespace CGame
                     return CharacterSpawnError.DefinitionNotFound;
                 default:
                     return CharacterSpawnError.InvalidDefinition;
+            }
+        }
+
+        private ICharacterControllerBinding BindController(
+            CharacterSpawnRequest request,
+            CharacterRuntimeId runtimeId,
+            CharacterAssembly assembly)
+        {
+            switch (request.ControlKind)
+            {
+                case CharacterControlKind.LocalPlayer:
+                    return localPlayerBinder.Bind(assembly.Character, request.InputType);
+                case CharacterControlKind.AI:
+                    return aiControllerBinder.Bind(runtimeId, assembly);
+                default:
+                    throw new InvalidOperationException($"Unsupported character control kind: {request.ControlKind}.");
             }
         }
 

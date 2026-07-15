@@ -22,6 +22,7 @@ namespace CGame
         JumpPressed,
         SprintHeld,
         AimHeld,
+        ReloadPressed,
     }
 
     /// <summary>
@@ -46,6 +47,7 @@ namespace CGame
         Jump,
         Sprint,
         Aim,
+        Reload,
     }
 
     /// <summary>

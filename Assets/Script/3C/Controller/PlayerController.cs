@@ -6,6 +6,7 @@ namespace CGame
     public class PlayerController : Controller
     {
         private Func<PlayerInputState> inputStateProvider;
+        private ICombatIntentSink combatIntentSink;
 
         public float MouseSensitivity { get; set; } = 1f;
         public float StickDegreesPerSecond { get; set; } = 180f;
@@ -42,6 +43,23 @@ namespace CGame
             LookSensitivityMultiplier = multiplier;
         }
 
+        public void SettingCombatIntentSink(ICombatIntentSink sink)
+        {
+            if (combatIntentSink == sink)
+            {
+                return;
+            }
+
+            combatIntentSink?.SubmitCombatIntent(default);
+            combatIntentSink = sink;
+        }
+
+        public override void UnpossessingPawn()
+        {
+            combatIntentSink?.SubmitCombatIntent(default);
+            base.UnpossessingPawn();
+        }
+
         /// <summary>
         /// 更新玩家控制器逻辑。
         /// </summary>
@@ -73,6 +91,10 @@ namespace CGame
             Vector3 worldDirection = movementRotation * localDirection;
             ControlledPawn.SubmitControlIntent(
                 new CharacterControlIntent(worldDirection, inputState.JumpPressed));
+            combatIntentSink?.SubmitCombatIntent(new CharacterCombatIntent(
+                ControlRotation * Vector3.forward,
+                inputState.FirePressed || inputState.FireHeld,
+                inputState.ReloadPressed));
         }
     }
 }

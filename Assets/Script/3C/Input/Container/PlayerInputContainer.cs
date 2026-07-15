@@ -18,6 +18,7 @@ namespace CGame
                 [PlayerInputStateKey.JumpPressed] = PlayerAction.Jump,
                 [PlayerInputStateKey.SprintHeld] = PlayerAction.Sprint,
                 [PlayerInputStateKey.AimHeld] = PlayerAction.Aim,
+                [PlayerInputStateKey.ReloadPressed] = PlayerAction.Reload,
             };
 
         private readonly PlayerInput input;
@@ -83,6 +84,7 @@ namespace CGame
                 JumpPressed = input.Player.Jump.WasPressedThisFrame(),
                 SprintHeld = input.Player.Sprint.IsPressed(),
                 AimHeld = input.Player.Aim.IsPressed(),
+                ReloadPressed = input.Player.Reload.WasPressedThisFrame(),
             };
         }
 

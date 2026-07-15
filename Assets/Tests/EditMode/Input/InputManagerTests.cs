@@ -74,6 +74,7 @@ namespace CGame.Tests
 
             Press(keyboard.wKey);
             Press(keyboard.spaceKey);
+            Press(keyboard.rKey);
             Press(mouse.leftButton);
             UpdateInputManager();
 
@@ -82,6 +83,7 @@ namespace CGame.Tests
             Assert.IsFalse(state.JumpPressed);
             Assert.IsFalse(state.FirePressed);
             Assert.IsFalse(state.FireHeld);
+            Assert.IsFalse(state.ReloadPressed);
         }
 
         /// <summary>
@@ -220,7 +222,7 @@ namespace CGame.Tests
         }
 
         /// <summary>
-        /// 验证 Player 输入方案下的移动、视角、开火、跳跃、冲刺、瞄准都能正常写入输入快照。
+        /// 验证 Player 输入方案下的移动、视角、开火、跳跃、冲刺、瞄准、换弹都能正常写入输入快照。
         /// </summary>
         [Test]
         public void PlayerActions_UpdatePlayerInputState()
@@ -260,6 +262,12 @@ namespace CGame.Tests
             UpdateInputManager();
             Assert.IsTrue(playerHandle.GetState<PlayerInputState>().AimHeld);
             Release(mouse.rightButton);
+            UpdateInputManager();
+
+            Press(keyboard.rKey);
+            UpdateInputManager();
+            Assert.IsTrue(playerHandle.GetState<PlayerInputState>().ReloadPressed);
+            Release(keyboard.rKey);
             UpdateInputManager();
         }
 
@@ -535,6 +543,10 @@ namespace CGame.Tests
             /// 统计瞄准回调次数。
             /// </summary>
             public void OnAim(InputAction.CallbackContext context)
+            {
+            }
+
+            public void OnReload(InputAction.CallbackContext context)
             {
             }
         }
