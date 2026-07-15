@@ -8,9 +8,18 @@ namespace CGame
         private Func<PlayerInputState> inputStateProvider;
         private ICombatIntentSink combatIntentSink;
 
+        public float MouseSensitivity { get; set; } = 1f;
+        public float StickDegreesPerSecond { get; set; } = 180f;
+        public float LookSensitivityMultiplier { get; private set; } = 1f;
+        public bool AimHeld { get; private set; }
+
         public void SettingInputStateProvider(Func<PlayerInputState> provider)
         {
             inputStateProvider = provider;
+            if (provider == null)
+            {
+                AimHeld = false;
+            }
         }
 
         public void SettingInputHandle(InputHandle handle)
@@ -18,6 +27,20 @@ namespace CGame
             inputStateProvider = handle == null
                 ? null
                 : () => handle.GetState<PlayerInputState>();
+            if (handle == null)
+            {
+                AimHeld = false;
+            }
+        }
+
+        public void SettingLookSensitivityMultiplier(float multiplier)
+        {
+            if (multiplier < 0f || float.IsNaN(multiplier) || float.IsInfinity(multiplier))
+            {
+                throw new ArgumentOutOfRangeException(nameof(multiplier));
+            }
+
+            LookSensitivityMultiplier = multiplier;
         }
 
         public void SettingCombatIntentSink(ICombatIntentSink sink)
@@ -42,16 +65,30 @@ namespace CGame
         /// </summary>
         public override void UpdatingController(float elapseSeconds)
         {
+            bool hasInputState = inputStateProvider != null;
+            PlayerInputState inputState = hasInputState ? inputStateProvider() : default;
+            AimHeld = hasInputState && inputState.AimHeld;
+            if (hasInputState && inputState.LookInput.TimeMode != LookInputTimeMode.None)
+            {
+                float sensitivity = inputState.LookInput.TimeMode == LookInputTimeMode.Delta
+                    ? MouseSensitivity
+                    : StickDegreesPerSecond;
+                Vector2 lookDelta = inputState.LookInput.ResolveFrameDelta(elapseSeconds) *
+                    sensitivity * LookSensitivityMultiplier;
+                AddingPitchInput(-lookDelta.y);
+                AddingYawInput(lookDelta.x);
+            }
+
             base.UpdatingController(elapseSeconds);
 
-            if (ControlledPawn == null || inputStateProvider == null)
+            if (ControlledPawn == null || !hasInputState)
             {
                 return;
             }
 
-            PlayerInputState inputState = inputStateProvider();
             Vector3 localDirection = new Vector3(inputState.MoveInput.x, 0f, inputState.MoveInput.y);
-            Vector3 worldDirection = ControlRotation * localDirection;
+            Quaternion movementRotation = Quaternion.Euler(0f, ControlYaw, 0f);
+            Vector3 worldDirection = movementRotation * localDirection;
             ControlledPawn.SubmitControlIntent(
                 new CharacterControlIntent(worldDirection, inputState.JumpPressed));
             combatIntentSink?.SubmitCombatIntent(new CharacterCombatIntent(

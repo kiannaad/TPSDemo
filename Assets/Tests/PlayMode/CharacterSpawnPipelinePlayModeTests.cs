@@ -14,6 +14,8 @@ namespace CGame.Tests
     {
         private Keyboard keyboard;
         private GameObject ground;
+        private GameObject lifetimeCamera;
+        private object cameraTargetBindingCoordinator;
 
         [SetUp]
         public override void Setup()
@@ -29,6 +31,18 @@ namespace CGame.Tests
         [TearDown]
         public override void TearDown()
         {
+            if (cameraTargetBindingCoordinator != null)
+            {
+                Invoke(cameraTargetBindingCoordinator, "Dispose");
+                cameraTargetBindingCoordinator = null;
+            }
+
+            if (lifetimeCamera != null)
+            {
+                UnityEngine.Object.DestroyImmediate(lifetimeCamera);
+                lifetimeCamera = null;
+            }
+
             DestroyIfPresent("[GameManager]");
             DestroyIfPresent("[CharacterRuntimeRoot]");
             if (ground != null)
@@ -39,6 +53,83 @@ namespace CGame.Tests
 
             keyboard = null;
             base.TearDown();
+        }
+
+        [UnityTest]
+        public IEnumerator CameraTargetBinding_UnbindsBeforeReleaseAndRebindsAfterRespawn()
+        {
+            object spawnManager = CharacterSpawnTestConfiguration.CreateManagerWithInMemoryDefinition();
+            Type bindingType = RequireRuntimeType("CGame.FirstPersonCameraBinding");
+            Type coordinatorType = RequireRuntimeType("CGame.LocalPlayerCameraTargetBinding");
+            object binding = Activator.CreateInstance(bindingType);
+            cameraTargetBindingCoordinator = Activator.CreateInstance(coordinatorType, spawnManager, binding);
+            lifetimeCamera = new GameObject("LocalPlayerCameraRig");
+            lifetimeCamera.AddComponent<Camera>();
+
+            object firstOperation = Invoke(spawnManager, "BeginSpawn", CreateRequest("camera-binding-first", "FirstCameraTarget", Vector3.zero));
+            for (int i = 0; i < 5; i++)
+            {
+                Invoke(spawnManager, "Update", 0f);
+            }
+
+            Assert.AreEqual("CharacterReady", GetProperty<object>(firstOperation, "State").ToString());
+            Assert.IsTrue(GetProperty<bool>(binding, "IsBound"));
+            object firstTarget = GetProperty<object>(binding, "Target");
+            Assert.AreEqual("FirstPersonCameraAnchor", firstTarget.GetType().Name);
+            Component firstAnchor = (Component)firstTarget;
+            Assert.AreEqual("CharacterVisual", firstAnchor.transform.name);
+            Assert.AreEqual("FirstCameraTarget", firstAnchor.transform.parent.name);
+            Assert.That(GetProperty<Vector3>(firstTarget, "Position").y, Is.EqualTo(1.6f).Within(0.001f));
+            Assert.AreEqual("Bound", GetProperty<object>(cameraTargetBindingCoordinator, "LastResult").ToString());
+
+            bool releasingObserved = false;
+            bool bindingUnboundDuringReleasing = false;
+            bool characterExistsDuringReleasing = false;
+            AddEventHandler(spawnManager, "CharacterReleasing", arguments =>
+            {
+                releasingObserved = true;
+                bindingUnboundDuringReleasing = !GetProperty<bool>(binding, "IsBound");
+                characterExistsDuringReleasing = GameObject.Find("FirstCameraTarget") != null;
+            });
+
+            object reason = Enum.Parse(RequireRuntimeType("CGame.CharacterDespawnReason"), "Requested");
+            Assert.IsTrue((bool)Invoke(spawnManager, "Despawn", GetProperty<object>(firstOperation, "RuntimeId"), reason));
+            Invoke(spawnManager, "Update", 0f);
+            yield return null;
+
+            Assert.IsTrue(releasingObserved);
+            Assert.IsTrue(bindingUnboundDuringReleasing);
+            Assert.IsTrue(characterExistsDuringReleasing);
+            Assert.IsFalse(GetProperty<bool>(binding, "IsBound"));
+            Assert.NotNull(lifetimeCamera);
+            Assert.IsNull(GameObject.Find("FirstCameraTarget"));
+
+            object secondOperation = Invoke(spawnManager, "BeginSpawn", CreateRequest("camera-binding-second", "SecondCameraTarget", new Vector3(2f, 0f, 0f)));
+            for (int i = 0; i < 5; i++)
+            {
+                Invoke(spawnManager, "Update", 0f);
+            }
+
+            Assert.AreEqual("CharacterReady", GetProperty<object>(secondOperation, "State").ToString());
+            Assert.IsTrue(GetProperty<bool>(binding, "IsBound"));
+            Assert.AreEqual("FirstPersonCameraAnchor", GetProperty<object>(binding, "Target").GetType().Name);
+            Assert.AreNotSame(firstTarget, GetProperty<object>(binding, "Target"));
+        }
+
+        [UnityTest]
+        public IEnumerator CameraTargetBinding_MissingAnchorReturnsExplicitFailure()
+        {
+            GameObject characterWithoutAnchor = new GameObject("CharacterWithoutCameraAnchor");
+            Type bindingType = RequireRuntimeType("CGame.FirstPersonCameraBinding");
+            object binding = Activator.CreateInstance(bindingType);
+
+            object result = Invoke(binding, "BindCharacter", characterWithoutAnchor.transform);
+
+            Assert.AreEqual("MissingAnchor", result.ToString());
+            Assert.IsFalse(GetProperty<bool>(binding, "IsBound"));
+            UnityEngine.Object.Destroy(characterWithoutAnchor);
+            yield return null;
+            Assert.IsTrue(characterWithoutAnchor == null);
         }
 
         [UnityTest]
