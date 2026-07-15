@@ -6,6 +6,7 @@ namespace CGame
     public class PlayerController : Controller
     {
         private Func<PlayerInputState> inputStateProvider;
+        private ICombatIntentSink combatIntentSink;
 
         public void SettingInputStateProvider(Func<PlayerInputState> provider)
         {
@@ -17,6 +18,23 @@ namespace CGame
             inputStateProvider = handle == null
                 ? null
                 : () => handle.GetState<PlayerInputState>();
+        }
+
+        public void SettingCombatIntentSink(ICombatIntentSink sink)
+        {
+            if (combatIntentSink == sink)
+            {
+                return;
+            }
+
+            combatIntentSink?.SubmitCombatIntent(default);
+            combatIntentSink = sink;
+        }
+
+        public override void UnpossessingPawn()
+        {
+            combatIntentSink?.SubmitCombatIntent(default);
+            base.UnpossessingPawn();
         }
 
         /// <summary>
@@ -36,6 +54,10 @@ namespace CGame
             Vector3 worldDirection = ControlRotation * localDirection;
             ControlledPawn.SubmitControlIntent(
                 new CharacterControlIntent(worldDirection, inputState.JumpPressed));
+            combatIntentSink?.SubmitCombatIntent(new CharacterCombatIntent(
+                ControlRotation * Vector3.forward,
+                inputState.FirePressed || inputState.FireHeld,
+                inputState.ReloadPressed));
         }
     }
 }

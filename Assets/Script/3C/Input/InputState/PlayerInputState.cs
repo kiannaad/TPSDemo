@@ -11,5 +11,6 @@ namespace CGame
         public bool    JumpPressed;
         public bool    SprintHeld;
         public bool    AimHeld;
+        public bool    ReloadPressed;
     }
 }
