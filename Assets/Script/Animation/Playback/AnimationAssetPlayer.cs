@@ -1,19 +1,23 @@
-using Animancer;
 using UnityEngine;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
 namespace CGame.Animation
 {
     public class AnimationAssetPlayer : MonoBehaviour
     {
-        [SerializeField] private AnimancerComponent animancer;
+        [SerializeField] private Animator animator;
         [SerializeField] private AnimationAssetBase animationAsset;
         [SerializeField] private bool playOnEnable = true;
+
+        private PlayableGraph graph;
+        private AnimationClipPlayable clipPlayable;
         private AnimationNotifyRuntime notifyRuntime;
 
-        public AnimancerComponent Animancer
+        public Animator Animator
         {
-            get => animancer;
-            set => animancer = value;
+            get => animator;
+            set => animator = value;
         }
 
         public AnimationAssetBase AnimationAsset
@@ -28,11 +32,12 @@ namespace CGame.Animation
             set => playOnEnable = value;
         }
 
+        public bool IsPlaying => graph.IsValid() && graph.IsPlaying();
         public AnimationNotifyRuntime NotifyRuntime => notifyRuntime;
 
         private void Reset()
         {
-            animancer = GetComponent<AnimancerComponent>();
+            animator = GetComponent<Animator>();
         }
 
         private void OnEnable()
@@ -43,60 +48,74 @@ namespace CGame.Animation
             }
         }
 
+        private void Update()
+        {
+            EvaluateWithNotify(Time.deltaTime);
+        }
+
         private void OnDisable()
         {
-            EndNotifyRuntime(AnimationNotifyEndReason.OwnerDisabled);
+            Stop(AnimationNotifyEndReason.OwnerDisabled);
         }
 
         private void OnDestroy()
         {
-            EndNotifyRuntime(AnimationNotifyEndReason.Interrupted);
+            Stop(AnimationNotifyEndReason.Interrupted);
         }
 
-        public AnimancerState Play()
+        public bool Play()
         {
-            if (animancer == null)
+            if (animator == null)
             {
-                animancer = GetComponent<AnimancerComponent>();
+                animator = GetComponent<Animator>();
             }
 
-            if (animationAsset == null)
+            if (animator == null || animationAsset == null || !animationAsset.IsValid || animationAsset.MainClip == null)
             {
-                return null;
+                return false;
             }
 
-            EndNotifyRuntime(AnimationNotifyEndReason.Interrupted);
+            Stop(AnimationNotifyEndReason.Interrupted);
 
-            AnimancerState state = animancer.Play(animationAsset);
+            graph = PlayableGraph.Create($"{name}.AnimationAssetPlayer");
+            graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+            clipPlayable = AnimationClipPlayable.Create(graph, animationAsset.MainClip);
+            clipPlayable.SetApplyFootIK(false);
             if (animationAsset is AnimationClipAsset clipAsset)
             {
-                notifyRuntime = animancer.CreateNotifyRuntime(gameObject, clipAsset, state);
+                clipPlayable.SetSpeed(clipAsset.Speed);
+                notifyRuntime = new AnimationNotifyRuntime(gameObject, clipAsset);
             }
 
-            return state;
+            AnimationPlayableOutput output = AnimationPlayableOutput.Create(graph, "Animation", animator);
+            output.SetSourcePlayable(clipPlayable);
+            graph.Play();
+            return true;
         }
 
         public void EvaluateWithNotify(float deltaTime)
         {
-            notifyRuntime?.EvaluateWithNotify(deltaTime);
+            if (!graph.IsValid() || !graph.IsPlaying())
+            {
+                return;
+            }
+
+            float clampedDeltaTime = Mathf.Max(0f, deltaTime);
+            graph.Evaluate(clampedDeltaTime);
+            notifyRuntime?.Tick(Mathf.Max(0f, (float)clipPlayable.GetTime()), clampedDeltaTime, 1f);
         }
 
-#if UNITY_INCLUDE_TESTS
-        public void CaptureNotifyBeforeEvaluateForTesting()
-        {
-            notifyRuntime?.CaptureBeforeEvaluate();
-        }
-
-        public void DispatchNotifyAfterEvaluateForTesting(float deltaTime)
-        {
-            notifyRuntime?.DispatchAfterEvaluate(deltaTime);
-        }
-#endif
-
-        private void EndNotifyRuntime(AnimationNotifyEndReason reason)
+        public void Stop(AnimationNotifyEndReason reason = AnimationNotifyEndReason.Interrupted)
         {
             notifyRuntime?.EndAll(reason);
             notifyRuntime = null;
+
+            if (graph.IsValid())
+            {
+                graph.Destroy();
+            }
+
+            clipPlayable = default;
         }
     }
 }

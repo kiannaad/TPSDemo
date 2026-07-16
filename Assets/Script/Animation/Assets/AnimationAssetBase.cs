@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Animancer;
 using UnityEngine;
 
 namespace CGame.Animation
@@ -14,8 +13,6 @@ namespace CGame.Animation
         public IReadOnlyList<AnimationNotifyTrack> NotifyTracks => notifyTracks;
 
         public virtual bool CanEditNotifies => MainClip != null;
-
-        public abstract ITransition CreateTransition();
 
         public AnimationNotifyTrack AddNotifyTrack(string trackName = "Notify Track")
         {
@@ -70,11 +67,6 @@ namespace CGame.Animation
             }
 
             return notifyTracks[trackIndex].AddEvent(notify, startFrame, durationFrames);
-        }
-
-        public AnimancerState Play(AnimancerComponent animancer)
-        {
-            return animancer.Play(this);
         }
 
         private bool IsValidTrackIndex(int index)

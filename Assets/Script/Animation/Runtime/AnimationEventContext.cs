@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Animancer;
 using UnityEngine;
 
 namespace CGame.Animation
@@ -11,8 +10,6 @@ namespace CGame.Animation
 
         public AnimationEventContext(
             UnityEngine.Object owner,
-            AnimancerComponent animancer,
-            AnimancerState animancerState,
             AnimationAssetBase animationAsset,
             AnimationNotifyEvent notifyEvent,
             float normalizedTime,
@@ -26,9 +23,7 @@ namespace CGame.Animation
             Owner = owner;
             OwnerGameObject = ResolveOwnerGameObject(owner);
             OwnerTransform = OwnerGameObject != null ? OwnerGameObject.transform : null;
-            AnimancerComponent = animancer != null ? animancer : OwnerGameObject != null ? OwnerGameObject.GetComponent<AnimancerComponent>() : null;
             Animator = OwnerGameObject != null ? OwnerGameObject.GetComponent<Animator>() : null;
-            AnimancerState = animancerState;
             AnimationAsset = animationAsset;
             NotifyEvent = notifyEvent;
             EventTag = notifyEvent != null && notifyEvent.Notify != null ? notifyEvent.Notify.EventTag : string.Empty;
@@ -46,8 +41,6 @@ namespace CGame.Animation
         public GameObject OwnerGameObject { get; }
         public Transform OwnerTransform { get; }
         public Animator Animator { get; }
-        public AnimancerComponent AnimancerComponent { get; }
-        public AnimancerState AnimancerState { get; }
         public AnimationAssetBase AnimationAsset { get; }
         public AnimationNotifyEvent NotifyEvent { get; }
         public string EventTag { get; }

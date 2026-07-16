@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Animancer;
 using UnityEngine;
 
 namespace CGame.Animation
@@ -10,66 +9,28 @@ namespace CGame.Animation
 
         private readonly UnityEngine.Object owner;
         private readonly AnimationClipAsset clipAsset;
-        private readonly AnimancerState animancerState;
-        private readonly AnimancerComponent animancer;
         private readonly Dictionary<AnimationNotifyEvent, ActiveNotifyState> activeNotifyStates = new Dictionary<AnimationNotifyEvent, ActiveNotifyState>();
 
-        public AnimationNotifyRuntime(UnityEngine.Object owner, AnimationClipAsset clipAsset, AnimancerState animancerState = null, AnimancerComponent animancer = null)
+        public AnimationNotifyRuntime(UnityEngine.Object owner, AnimationClipAsset clipAsset)
         {
             this.owner = owner;
             this.clipAsset = clipAsset;
-            this.animancerState = animancerState;
-            this.animancer = animancer;
-
-            CurrentTime = GetStateTime();
-            LastTime = CurrentTime;
         }
 
         public UnityEngine.Object Owner => owner;
         public AnimationClipAsset ClipAsset => clipAsset;
-        public AnimancerState AnimancerState => animancerState;
         public float LastTime { get; private set; }
         public float CurrentTime { get; private set; }
         public int ActiveNotifyCount => activeNotifyStates.Count;
 
         public void Tick(float deltaTime)
         {
-            CaptureBeforeEvaluate();
-            if (animancerState != null)
-            {
-                DispatchAfterEvaluate(deltaTime);
-                return;
-            }
-
-            CurrentTime += Mathf.Max(0f, deltaTime);
-            DispatchAtCurrentTime(deltaTime, DefaultWeight);
-        }
-
-        public void EvaluateWithNotify(float deltaTime)
-        {
-            CaptureBeforeEvaluate();
-            animancer?.Evaluate(deltaTime);
-            DispatchAfterEvaluate(deltaTime);
+            Tick(CurrentTime + Mathf.Max(0f, deltaTime), deltaTime, DefaultWeight);
         }
 
         public void CaptureBeforeEvaluate()
         {
             LastTime = CurrentTime;
-        }
-
-        public void DispatchAfterEvaluate(float deltaTime)
-        {
-            CurrentTime = GetStateTime();
-            float weight = animancerState != null ? animancerState.Weight : DefaultWeight;
-            float clampedDeltaTime = Mathf.Max(0f, deltaTime);
-            float clampedWeight = Mathf.Max(0f, weight);
-            if (LastTime == CurrentTime)
-            {
-                EndActiveNotifiesIfNeeded(clampedDeltaTime, clampedWeight);
-                return;
-            }
-
-            DispatchAtCurrentTime(deltaTime, weight);
         }
 
         public void Tick(float currentTime, float deltaTime, float weight)
@@ -81,7 +42,7 @@ namespace CGame.Animation
 
         public void EndAll(AnimationNotifyEndReason reason)
         {
-            EndAll(reason, 0f, animancerState != null ? Mathf.Max(0f, animancerState.Weight) : DefaultWeight);
+            EndAll(reason, 0f, DefaultWeight);
         }
 
         private void DispatchAtCurrentTime(float deltaTime, float weight)
@@ -112,12 +73,6 @@ namespace CGame.Animation
             if (!IsOwnerEnabled())
             {
                 EndAll(AnimationNotifyEndReason.OwnerDisabled, deltaTime, weight);
-                return true;
-            }
-
-            if (animancerState != null && !animancerState.IsPlaying)
-            {
-                EndAll(AnimationNotifyEndReason.StateStopped, deltaTime, weight);
                 return true;
             }
 
@@ -223,8 +178,6 @@ namespace CGame.Animation
         {
             var context = new AnimationEventContext(
                 owner,
-                animancer,
-                animancerState,
                 clipAsset,
                 notifyEvent,
                 GetNormalizedTime(),
@@ -329,8 +282,6 @@ namespace CGame.Animation
         {
             return new AnimationEventContext(
                 owner,
-                animancer,
-                animancerState,
                 clipAsset,
                 notifyEvent,
                 GetNormalizedTime(),
@@ -350,11 +301,6 @@ namespace CGame.Animation
             {
                 receiver.OnAnimationNotify(context);
             }
-        }
-
-        private float GetStateTime()
-        {
-            return animancerState != null ? Mathf.Max(0f, animancerState.Time) : 0f;
         }
 
         private float GetNormalizedTime()

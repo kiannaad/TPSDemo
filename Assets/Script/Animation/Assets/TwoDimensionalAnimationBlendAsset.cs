@@ -1,13 +1,17 @@
 using System;
-using Animancer;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace CGame.Animation
 {
     [CreateAssetMenu(fileName = "TwoDimensionalAnimationBlendAsset", menuName = "CGame/Animation/2D Animation Blend Asset")]
     public class TwoDimensionalAnimationBlendAsset : AnimationAssetBase
     {
+        public enum BlendType
+        {
+            Cartesian,
+            Directional,
+        }
+
         [Serializable]
         public class BlendChild
         {
@@ -41,11 +45,11 @@ namespace CGame.Animation
             }
         }
 
-        [SerializeField] private MixerTransition2D.MixerType mixerType = MixerTransition2D.MixerType.Directional;
+        [SerializeField] private BlendType mixerType = BlendType.Directional;
         [SerializeField] private Vector2 defaultParameter;
         [SerializeField] private BlendChild[] children = Array.Empty<BlendChild>();
 
-        public MixerTransition2D.MixerType MixerType
+        public BlendType MixerType
         {
             get => mixerType;
             set => mixerType = value;
@@ -87,36 +91,5 @@ namespace CGame.Animation
             }
         }
 
-        public override ITransition CreateTransition()
-        {
-            return CreateMixerTransition();
-        }
-
-        public MixerTransition2D CreateMixerTransition()
-        {
-            int childCount = children?.Length ?? 0;
-            var animations = new Object[childCount];
-            var thresholds = new Vector2[childCount];
-            var speeds = new float[childCount];
-            var synchronizeChildren = new bool[childCount];
-
-            for (int i = 0; i < childCount; i++)
-            {
-                BlendChild child = children[i];
-                animations[i] = child?.ClipAsset?.MainClip;
-                thresholds[i] = child != null ? child.Threshold : default;
-                speeds[i] = child != null ? child.Speed : 1f;
-                synchronizeChildren[i] = child == null || child.Synchronize;
-            }
-
-            var transition = new MixerTransition2D();
-            transition.Type = mixerType;
-            transition.DefaultParameter = defaultParameter;
-            transition.Animations = animations;
-            transition.Thresholds = thresholds;
-            transition.Speeds = speeds;
-            transition.SynchronizeChildren = synchronizeChildren;
-            return transition;
-        }
     }
 }

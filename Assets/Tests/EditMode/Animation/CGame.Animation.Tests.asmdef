@@ -4,8 +4,7 @@
     "references": [
         "CGame.Animation",
         "CGame.Weapon",
-        "CGame.Animation.Editor",
-        "Kybernetik.Animancer"
+        "CGame.Animation.Editor"
     ],
     "includePlatforms": [
         "Editor"

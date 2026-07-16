@@ -1,4 +1,3 @@
-using Animancer;
 using UnityEngine;
 
 namespace CGame.Animation
@@ -25,7 +24,7 @@ namespace CGame.Animation
             }
         }
 
-        [SerializeField, Min(0f)] private float fadeDuration = AnimancerGraph.DefaultFadeDuration;
+        [SerializeField, Min(0f)] private float fadeDuration = 0.25f;
         [SerializeField] private SequenceEntry[] clips = System.Array.Empty<SequenceEntry>();
 
         public float FadeDuration
@@ -66,45 +65,5 @@ namespace CGame.Animation
             }
         }
 
-        public override ITransition CreateTransition()
-        {
-            return CreateSequenceTransition();
-        }
-
-        public ClipTransitionSequence CreateSequenceTransition()
-        {
-            var transition = new ClipTransitionSequence
-            {
-                Clip = MainClip,
-                FadeDuration = fadeDuration,
-            };
-
-            if (clips == null || clips.Length == 0)
-            {
-                transition.Others = System.Array.Empty<ClipTransition>();
-                return transition;
-            }
-
-            ApplyEntryToTransition(clips[0], transition);
-
-            var others = new ClipTransition[Mathf.Max(0, clips.Length - 1)];
-            for (int i = 1; i < clips.Length; i++)
-            {
-                var clipTransition = new ClipTransition();
-                ApplyEntryToTransition(clips[i], clipTransition);
-                others[i - 1] = clipTransition;
-            }
-
-            transition.Others = others;
-            return transition;
-        }
-
-        private void ApplyEntryToTransition(SequenceEntry entry, ClipTransition transition)
-        {
-            AnimationClipAsset clipAsset = entry?.ClipAsset;
-            transition.Clip = clipAsset?.MainClip;
-            transition.FadeDuration = fadeDuration;
-            transition.Speed = clipAsset != null ? clipAsset.Speed * (entry?.Speed ?? 1f) : 1f;
-        }
     }
 }

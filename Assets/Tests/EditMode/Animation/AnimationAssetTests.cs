@@ -1,4 +1,3 @@
-using Animancer;
 using CGame.Animation;
 using CGame.Animation.Editor;
 using NUnit.Framework;
@@ -14,21 +13,18 @@ namespace CGame.Tests
     public class AnimationAssetTests
     {
         [Test]
-        public void ClipAsset_CreatesPlayableClipTransition()
+        public void ClipAsset_ExposesPlayableClipData()
         {
             AnimationClip clip = new AnimationClip();
             AnimationClipAsset asset = ScriptableObject.CreateInstance<AnimationClipAsset>();
             asset.TryInitialize(clip);
 
-            ITransition transition = asset.CreateTransition();
-
             Assert.IsTrue(asset.IsValid);
-            Assert.IsInstanceOf<ClipTransition>(transition);
-            Assert.AreSame(clip, ((ClipTransition)transition).Clip);
+            Assert.AreSame(clip, asset.MainClip);
         }
 
         [Test]
-        public void SequenceAsset_CreatesPlayableClipTransition()
+        public void SequenceAsset_ExposesFirstClipAsMainClip()
         {
             AnimationClip clip = new AnimationClip();
             AnimationClipAsset clipAsset = ScriptableObject.CreateInstance<AnimationClipAsset>();
@@ -42,11 +38,8 @@ namespace CGame.Tests
                 },
             };
 
-            ITransition transition = asset.CreateTransition();
-
             Assert.IsTrue(asset.IsValid);
-            Assert.IsInstanceOf<ClipTransitionSequence>(transition);
-            Assert.AreSame(clip, ((ClipTransition)transition).Clip);
+            Assert.AreSame(clip, asset.MainClip);
         }
 
         [Test]
@@ -65,7 +58,7 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void SequenceAsset_CreatesTransitionSequenceFromClipAssets()
+        public void SequenceAsset_PreservesClipAssetsAndPlaybackSpeeds()
         {
             AnimationClip firstClip = new AnimationClip();
             AnimationClip secondClip = new AnimationClip();
@@ -89,14 +82,12 @@ namespace CGame.Tests
                 },
             };
 
-            ClipTransitionSequence transition = sequence.CreateSequenceTransition();
-
             Assert.IsTrue(sequence.IsValid);
-            Assert.AreSame(firstClip, transition.Clip);
-            Assert.AreEqual(1, transition.Others.Length);
-            Assert.AreSame(secondClip, transition.Others[0].Clip);
-            Assert.AreEqual(0.5f, transition.Speed);
-            Assert.AreEqual(3f, transition.Others[0].Speed);
+            Assert.AreSame(firstClip, sequence.MainClip);
+            Assert.AreSame(firstAsset, sequence.Clips[0].ClipAsset);
+            Assert.AreSame(secondAsset, sequence.Clips[1].ClipAsset);
+            Assert.AreEqual(0.5f, sequence.Clips[0].Speed);
+            Assert.AreEqual(2f, sequence.Clips[1].Speed);
         }
 
         [Test]
@@ -129,7 +120,7 @@ namespace CGame.Tests
         }
 
         [Test]
-        public void TwoDimensionalBlend_ReferencesClipAssetsAndCreatesMixerTransition()
+        public void TwoDimensionalBlend_PreservesClipAssetsAndThresholds()
         {
             AnimationClip idleClip = new AnimationClip();
             AnimationClip moveClip = new AnimationClip();
@@ -153,16 +144,15 @@ namespace CGame.Tests
                 },
             };
 
-            MixerTransition2D transition = blend.CreateMixerTransition();
-
             Assert.IsTrue(blend.IsValid);
-            Assert.AreEqual(2, transition.Animations.Length);
-            Assert.AreSame(idleClip, transition.Animations[0]);
-            Assert.AreSame(moveClip, transition.Animations[1]);
-            Assert.AreEqual(Vector2.zero, transition.Thresholds[0]);
-            Assert.AreEqual(Vector2.up, transition.Thresholds[1]);
+            Assert.AreEqual(2, blend.Children.Length);
+            Assert.AreSame(idle, blend.Children[0].ClipAsset);
+            Assert.AreSame(move, blend.Children[1].ClipAsset);
+            Assert.AreEqual(Vector2.zero, blend.Children[0].Threshold);
+            Assert.AreEqual(Vector2.up, blend.Children[1].Threshold);
         }
 
+#if ANIMANCER
         [Test]
         public void AnimationAssetPlayer_PlaysAssetThroughAnimancerComponent()
         {
@@ -431,6 +421,8 @@ namespace CGame.Tests
             }
         }
 
+#endif
+
         [Test]
         public void AnimationClipAssetFactory_RegistersCreateMenuPath()
         {
@@ -536,13 +528,14 @@ namespace CGame.Tests
             GameObject gameObject = new GameObject("ProjectIdleClipAssetPlaybackTest");
             try
             {
-                gameObject.AddComponent<Animator>();
-                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
+                Animator animator = gameObject.AddComponent<Animator>();
+                AnimationAssetPlayer player = gameObject.AddComponent<AnimationAssetPlayer>();
+                player.Animator = animator;
+                player.AnimationAsset = asset;
 
-                AnimancerState state = animancer.Play(asset);
-
-                Assert.IsNotNull(state);
-                Assert.AreSame(asset.AnimationClip, state.MainObject);
+                Assert.IsTrue(player.Play());
+                Assert.IsTrue(player.IsPlaying);
+                Assert.AreSame(asset, player.NotifyRuntime.ClipAsset);
             }
             finally
             {
@@ -550,6 +543,7 @@ namespace CGame.Tests
             }
         }
 
+#if ANIMANCER
         [Test]
         public void QuickPlaySampleScript_PlaysProjectIdleClipAssetOnEnable()
         {
@@ -602,6 +596,7 @@ namespace CGame.Tests
                 UnityEngine.Object.DestroyImmediate(gameObject);
             }
         }
+#endif
 
         [Test]
         public void AnimationAsset_AddsNotifyTracksAndEvents()
@@ -658,7 +653,6 @@ namespace CGame.Tests
             try
             {
                 Animator animator = gameObject.AddComponent<Animator>();
-                AnimancerComponent animancer = gameObject.AddComponent<AnimancerComponent>();
                 gameObject.transform.position = new Vector3(1f, 2f, 3f);
                 attachObject.transform.position = new Vector3(4f, 5f, 6f);
                 attachObject.transform.rotation = Quaternion.Euler(0f, 90f, 0f);
@@ -677,8 +671,6 @@ namespace CGame.Tests
 
                 var context = new AnimationEventContext(
                     gameObject,
-                    animancer,
-                    null,
                     asset,
                     notifyEvent,
                     0.5f,
@@ -691,7 +683,6 @@ namespace CGame.Tests
                 Assert.AreSame(gameObject, context.OwnerGameObject);
                 Assert.AreSame(gameObject.transform, context.OwnerTransform);
                 Assert.AreSame(animator, context.Animator);
-                Assert.AreSame(animancer, context.AnimancerComponent);
                 Assert.AreSame(asset, context.AnimationAsset);
                 Assert.AreSame(notifyEvent, context.NotifyEvent);
                 Assert.AreEqual("AnimEvent.Weapon.Swing", context.EventTag);
@@ -714,7 +705,7 @@ namespace CGame.Tests
         [Test]
         public void AnimationNotifyLifecycleEntries_AreRuntimeHooksWithoutAssetState()
         {
-            var context = new AnimationEventContext(null, null, null, null, null, 0.25f, 0.016f, 1f);
+            var context = new AnimationEventContext(null, null, null, 0.25f, 0.016f, 1f);
             var instant = new CountingInstantNotify();
             var duration = new CountingDurationNotify();
 
@@ -998,6 +989,7 @@ namespace CGame.Tests
             }
         }
 
+#if ANIMANCER
         [Test]
         public void AnimationNotifyRuntime_EndsActiveDurationNotifyWhenStateStopped()
         {
@@ -1027,6 +1019,7 @@ namespace CGame.Tests
                 UnityEngine.Object.DestroyImmediate(gameObject);
             }
         }
+#endif
 
         [Test]
         public void AnimationNotifyRuntime_KeepsDurationStateIsolatedPerRuntimeInstance()
